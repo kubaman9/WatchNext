@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getApiKey, setApiKey, usingFallbackKey } from '../../services/tmdbApi';
+import ModeToggle from '../shared/ModeToggle';
 
 export default function Settings({ onExit, onResetTaste }) {
   const { state, dispatch } = useApp();
   const [key, setKey] = useState(usingFallbackKey() ? '' : getApiKey());
   const [confirmReset, setConfirmReset] = useState(false);
-  const { includeMovies, includeTv } = state.settings;
 
   function exportList() {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -23,10 +23,6 @@ export default function Settings({ onExit, onResetTaste }) {
     location.reload();
   }
 
-  function toggle(field) {
-    dispatch({ type: 'SET_SETTINGS', payload: { [field]: !state.settings[field] } });
-  }
-
   return (
     <div className="mx-auto min-h-screen max-w-xl px-5 py-5">
       <div className="flex items-center gap-3">
@@ -37,15 +33,12 @@ export default function Settings({ onExit, onResetTaste }) {
       </div>
 
       <section className="mt-6 space-y-3">
-        <h2 className="text-sm uppercase tracking-wider text-sub">Content</h2>
-        <label className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3">
-          <span className="text-txt">Include movies</span>
-          <input type="checkbox" checked={includeMovies} onChange={() => toggle('includeMovies')} />
-        </label>
-        <label className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3">
-          <span className="text-txt">Include TV</span>
-          <input type="checkbox" checked={includeTv} onChange={() => toggle('includeTv')} />
-        </label>
+        <h2 className="text-sm uppercase tracking-wider text-sub">Default mode</h2>
+        <p className="text-sm text-sub">What the button recommends by default.</p>
+        <ModeToggle
+          value={state.settings.mode || 'both'}
+          onChange={(mode) => dispatch({ type: 'SET_SETTINGS', payload: { mode } })}
+        />
       </section>
 
       <section className="mt-6 space-y-2">

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useTitles } from '../../hooks/useTitles';
 import TitleDetail from './TitleDetail';
+import TypeBadge from '../shared/TypeBadge';
+import ModeToggle from '../shared/ModeToggle';
 
 const FALLBACK =
   'data:image/svg+xml;utf8,' +
@@ -17,16 +19,19 @@ const SORTS = {
 export default function MyList({ onExit }) {
   const { watched } = useTitles();
   const [sort, setSort] = useState('rank');
+  const [mode, setMode] = useState('both');
   const [q, setQ] = useState('');
   const [detail, setDetail] = useState(null);
 
   const rows = useMemo(() => {
-    let list = watched.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
+    let list = watched
+      .filter((t) => mode === 'both' || t.type === mode)
+      .filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
     if (sort === 'recent')
       list = [...list].sort((a, b) => (b.watchedDate || '').localeCompare(a.watchedDate || ''));
     else if (sort === 'az') list = [...list].sort((a, b) => a.title.localeCompare(b.title));
     return list;
-  }, [watched, sort, q]);
+  }, [watched, sort, mode, q]);
 
   function rankOf(id) {
     return watched.findIndex((t) => t.id === id) + 1;
@@ -48,7 +53,7 @@ export default function MyList({ onExit }) {
         className="mt-4 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-txt outline-none focus:border-accent"
       />
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {Object.entries(SORTS).map(([k, label]) => (
           <button
             key={k}
@@ -60,6 +65,7 @@ export default function MyList({ onExit }) {
             {label}
           </button>
         ))}
+        <ModeToggle value={mode} onChange={setMode} className="ml-auto" />
       </div>
 
       {!rows.length && <p className="mt-10 text-center text-sub">Nothing ranked yet.</p>}
@@ -80,10 +86,13 @@ export default function MyList({ onExit }) {
                 onError={(e) => (e.currentTarget.src = FALLBACK)}
                 className="h-16 w-11 shrink-0 rounded object-cover"
               />
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-txt">{t.title}</span>
-                <span className="block text-sm text-sub">
-                  {t.year || '—'} · {(t.genres || []).slice(0, 2).join(', ')}
+                <span className="mt-1 flex items-center gap-2 text-sm text-sub">
+                  <TypeBadge type={t.type} />
+                  <span className="truncate">
+                    {t.year || '—'} · {(t.genres || []).slice(0, 2).join(', ')}
+                  </span>
                 </span>
               </span>
             </button>

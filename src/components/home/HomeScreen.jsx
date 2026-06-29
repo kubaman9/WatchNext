@@ -8,6 +8,7 @@ import PostWatchRanking from '../ranking/PostWatchRanking';
 import Overlay from '../shared/Overlay';
 import SearchSheet from '../shared/SearchSheet';
 import PosterCard from '../shared/PosterCard';
+import ModeToggle from '../shared/ModeToggle';
 
 function greeting() {
   const h = new Date().getHours();
@@ -99,7 +100,12 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
         </header>
 
         <main className="flex flex-1 flex-col items-center justify-center px-5 text-center">
-          <p className="mb-8 font-display text-2xl text-sub">{greeting()}</p>
+          <p className="mb-5 font-display text-2xl text-sub">{greeting()}</p>
+          <ModeToggle
+            value={state.settings.mode || 'both'}
+            onChange={(mode) => dispatch({ type: 'SET_SETTINGS', payload: { mode } })}
+            className="mb-6"
+          />
           <motion.button
             onClick={fire}
             whileHover={{ scale: 1.02 }}

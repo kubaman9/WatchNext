@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import GenreBadge from './GenreBadge';
+import TypeBadge from './TypeBadge';
 
 const FALLBACK =
   'data:image/svg+xml;utf8,' +
@@ -32,10 +33,9 @@ function Card({ title, side, highlighted, winner, loser, onPick }) {
       </div>
       <div className="p-3">
         <div className="font-display text-lg leading-tight text-txt">{title.title}</div>
-        <div className="mt-0.5 text-sm text-sub">
-          {title.year || '—'} · {title.type === 'tv' ? 'TV' : 'Movie'}
-        </div>
+        <div className="mt-0.5 text-sm text-sub">{title.year || '—'}</div>
         <div className="mt-2 flex flex-wrap gap-1">
+          <TypeBadge type={title.type} />
           {(title.genres || []).slice(0, 2).map((g) => (
             <GenreBadge key={g}>{g}</GenreBadge>
           ))}

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import GenreBadge from '../shared/GenreBadge';
+import TypeBadge from '../shared/TypeBadge';
 import Overlay from '../shared/Overlay';
 import PostWatchRanking from '../ranking/PostWatchRanking';
 
@@ -49,10 +50,9 @@ export default function TitleDetail({ title, onClose }) {
             />
             <div className="min-w-0">
               <div className="font-display text-2xl text-txt">{title.title}</div>
-              <div className="mt-1 text-sm text-sub">
-                {title.year || '—'} · {title.type === 'tv' ? 'TV' : 'Movie'}
-              </div>
+              <div className="mt-1 text-sm text-sub">{title.year || '—'}</div>
               <div className="mt-2 flex flex-wrap gap-1">
+                <TypeBadge type={title.type} />
                 {(title.genres || []).map((g) => (
                   <GenreBadge key={g}>{g}</GenreBadge>
                 ))}

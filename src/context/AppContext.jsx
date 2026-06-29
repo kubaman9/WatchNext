@@ -8,7 +8,7 @@ const AppContext = createContext(null);
 const initialState = {
   titles: [],
   taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false },
-  settings: { includeMovies: true, includeTv: true },
+  settings: { mode: 'both' }, // 'movie' | 'tv' | 'both'
 };
 
 function reducer(state, action) {

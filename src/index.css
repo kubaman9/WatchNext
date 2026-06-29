@@ -14,8 +14,9 @@ body,
 
 body {
   margin: 0;
-  background: #09090e;
-  color: #f9fafb;
+  background: #0a0506;
+  background-image: radial-gradient(120% 80% at 50% -10%, rgba(139, 14, 22, 0.35), transparent 60%);
+  color: #f8f4f4;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -25,7 +26,7 @@ body {
   width: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #222230;
+  background: #3a1c22;
   border-radius: 8px;
 }
 

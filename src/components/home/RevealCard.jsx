@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useProviders } from '../../hooks/useTmdb';
 import GenreBadge from '../shared/GenreBadge';
+import TypeBadge from '../shared/TypeBadge';
 
 const FALLBACK =
   'data:image/svg+xml;utf8,' +
@@ -48,10 +49,13 @@ export default function RevealCard({ title, skipStreak, onWatch, onSkip, onClose
         </motion.div>
 
         <h1 className="mt-4 font-display text-3xl leading-tight text-txt">{title.title}</h1>
-        <p className="mt-1 text-sm text-sub">
-          {title.year || '—'} · {title.type === 'tv' ? 'TV' : 'Movie'}
-          {title.genres?.length ? ` · ${title.genres.slice(0, 3).join(', ')}` : ''}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <TypeBadge type={title.type} />
+          <span className="text-sm text-sub">
+            {title.year || '—'}
+            {title.genres?.length ? ` · ${title.genres.slice(0, 3).join(', ')}` : ''}
+          </span>
+        </div>
 
         <p className="mt-3 text-sm leading-relaxed text-sub">
           {expanded || !long ? synopsis : synopsis.slice(0, 140).trimEnd() + '… '}

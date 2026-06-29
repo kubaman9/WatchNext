@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { usePool } from '../../hooks/useTmdb';
 import GenreBadge from '../shared/GenreBadge';
+import TypeBadge from '../shared/TypeBadge';
 import Overlay from '../shared/Overlay';
 import PostWatchRanking from './PostWatchRanking';
 
@@ -29,7 +30,12 @@ export default function RankMode({ onExit }) {
       const classified = new Set(
         state.titles.filter((t) => t.watched || t.disliked).map((t) => t.id)
       );
-      setFeed(titles.filter((t) => !classified.has(t.id)));
+      const mode = state.settings.mode || 'both';
+      setFeed(
+        titles.filter(
+          (t) => !classified.has(t.id) && (mode === 'both' || t.type === mode)
+        )
+      );
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,10 +135,10 @@ export default function RankMode({ onExit }) {
               <div className="p-4">
                 <div className="font-display text-2xl text-txt">{card.title}</div>
                 <div className="mt-1 text-sm text-sub">
-                  {card.year || '—'} · {card.type === 'tv' ? 'TV' : 'Movie'} · ★{' '}
-                  {(card.rating || 0).toFixed(1)}
+                  {card.year || '—'} · ★ {(card.rating || 0).toFixed(1)}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
+                  <TypeBadge type={card.type} />
                   {(card.genres || []).slice(0, 3).map((g) => (
                     <GenreBadge key={g}>{g}</GenreBadge>
                   ))}
