@@ -78,6 +78,11 @@ export async function buildPool(size = 50) {
   return ALL.slice(0, size).map((t) => ({ ...t }));
 }
 
+export async function feedPage(page = 1, mode = 'both') {
+  if (page > 1) return []; // demo dataset is finite
+  return ALL.filter((t) => mode === 'both' || t.type === mode).map((t) => ({ ...t }));
+}
+
 export async function watchProviders() {
   const sample = ['Netflix', 'Max', 'Prime Video', 'Disney+', 'Hulu'];
   return sample.slice(0, 2 + Math.floor(Math.random() * 2));

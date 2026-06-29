@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { usePool } from '../../hooks/useTmdb';
+import { feedPage } from '../../services/tmdbApi';
 import GenreBadge from '../shared/GenreBadge';
 import TypeBadge from '../shared/TypeBadge';
 import Overlay from '../shared/Overlay';
@@ -13,71 +13,132 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
+const BUFFER = 5; // fetch more when this close to the end
+// Re-rank an existing title roughly every N classifications, more often as the
+// library grows (so big lists stay calibrated). Clamped to a sane range.
+function rerankInterval(libraryCount) {
+  return Math.min(8, Math.max(4, 12 - Math.floor(libraryCount / 8)));
+}
+
 export default function RankMode({ onExit }) {
   const { state, dispatch } = useApp();
-  const buildPool = usePool();
   const [feed, setFeed] = useState([]);
   const [i, setI] = useState(0);
   const [count, setCount] = useState(0);
-  const [ranking, setRanking] = useState(null);
+  const [flow, setFlow] = useState(null); // { title, kind: 'place' | 'rerank' }
   const [loading, setLoading] = useState(true);
-  const loaded = useRef(false);
+  const [exhausted, setExhausted] = useState(false);
 
+  const mode = useRef(state.settings.mode || 'both');
+  const knownIds = useRef(new Set());
+  const page = useRef(0);
+  const loadingMore = useRef(false);
+  const exhaustedRef = useRef(false);
+  const sinceRerank = useRef(0);
+  const started = useRef(false);
+
+  // Pull the next page(s) of fresh titles, skipping anything already shown or
+  // already classified. Keeps the feed effectively infinite on live TMDB.
+  const ensureBuffer = useCallback(async () => {
+    if (loadingMore.current || exhaustedRef.current) return;
+    loadingMore.current = true;
+    try {
+      let added = 0;
+      let empties = 0;
+      while (added < 12 && empties < 2) {
+        page.current += 1;
+        const titles = await feedPage(page.current, mode.current);
+        if (!titles.length) {
+          exhaustedRef.current = true;
+          setExhausted(true);
+          break;
+        }
+        const fresh = titles.filter(
+          (t) =>
+            !knownIds.current.has(t.id) &&
+            (mode.current === 'both' || t.type === mode.current)
+        );
+        if (!fresh.length) {
+          empties += 1;
+          continue;
+        }
+        fresh.forEach((t) => knownIds.current.add(t.id));
+        setFeed((f) => [...f, ...fresh]);
+        added += fresh.length;
+      }
+    } finally {
+      loadingMore.current = false;
+    }
+  }, []);
+
+  // Initial load: seed known ids from already-classified titles, then fill.
   useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
-    buildPool(40).then((titles) => {
-      const classified = new Set(
-        state.titles.filter((t) => t.watched || t.disliked).map((t) => t.id)
-      );
-      const mode = state.settings.mode || 'both';
-      setFeed(
-        titles.filter(
-          (t) => !classified.has(t.id) && (mode === 'both' || t.type === mode)
-        )
-      );
-      setLoading(false);
-    });
+    if (started.current) return;
+    started.current = true;
+    state.titles
+      .filter((t) => t.watched || t.disliked)
+      .forEach((t) => knownIds.current.add(t.id));
+    ensureBuffer().then(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Top up the buffer as the user nears the end.
+  useEffect(() => {
+    if (!loading && i >= feed.length - BUFFER) ensureBuffer();
+  }, [i, feed.length, loading, ensureBuffer]);
+
   const card = feed[i];
 
-  function advance() {
-    setI((n) => n + 1);
+  function maybeRerank() {
+    const lib = state.titles.filter((t) => t.watched && !t.disliked);
+    if (lib.length < 4) return false;
+    sinceRerank.current += 1;
+    if (sinceRerank.current >= rerankInterval(lib.length)) {
+      sinceRerank.current = 0;
+      const pick = lib[Math.floor(Math.random() * lib.length)];
+      setFlow({ title: pick, kind: 'rerank' });
+      return true;
+    }
+    return false;
   }
 
   function seen() {
-    if (!card) return;
+    if (!card || flow) return;
     dispatch({ type: 'ADD_TITLE', title: { ...card, watched: false } });
     dispatch({ type: 'MARK_WATCHED', id: card.id });
-    setRanking(card);
+    setFlow({ title: card, kind: 'place' });
   }
 
   function pass() {
-    if (!card) return;
+    if (!card || flow) return;
     dispatch({ type: 'ADD_TITLE', title: card });
     dispatch({ type: 'DISLIKE_TITLE', id: card.id });
     setCount((c) => c + 1);
-    advance();
+    setI((n) => n + 1);
+    maybeRerank();
   }
 
   function addToList() {
-    if (!card) return;
+    if (!card || flow) return;
     dispatch({ type: 'ADD_TITLE', title: card });
     setCount((c) => c + 1);
-    advance();
+    setI((n) => n + 1);
+    maybeRerank();
   }
 
-  function finishRanking() {
-    setRanking(null);
-    setCount((c) => c + 1);
-    advance();
+  function finishFlow() {
+    const f = flow;
+    setFlow(null);
+    if (f?.kind === 'place') {
+      setCount((c) => c + 1);
+      setI((n) => n + 1);
+      maybeRerank();
+    }
   }
 
   useEffect(() => {
     function onKey(e) {
-      if (ranking) return;
+      if (flow) return;
       if (e.key === 'ArrowRight') seen();
       else if (e.key === 'ArrowLeft') pass();
       else if (e.key === 'ArrowUp') addToList();
@@ -85,9 +146,10 @@ export default function RankMode({ onExit }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card, ranking]);
+  }, [card, flow]);
 
   function onDragEnd(_, info) {
+    if (flow) return;
     const { x, y } = info.offset;
     if (y < -120) addToList();
     else if (x > 120) seen();
@@ -172,12 +234,19 @@ export default function RankMode({ onExit }) {
       )}
 
       <AnimatePresence>
-        {ranking && (
-          <Overlay key="rank-battle">
-            <PostWatchRanking title={ranking} onDone={finishRanking} />
+        {flow && (
+          <Overlay key="rank-flow">
+            {flow.kind === 'rerank' && (
+              <p className="mb-4 text-sm uppercase tracking-wider text-gold">Quick re-rank</p>
+            )}
+            <PostWatchRanking title={flow.title} onDone={finishFlow} />
           </Overlay>
         )}
       </AnimatePresence>
+
+      {!loading && exhausted && card && (
+        <p className="pb-1 text-center text-xs text-neutral">End of the catalog is near.</p>
+      )}
     </div>
   );
 }

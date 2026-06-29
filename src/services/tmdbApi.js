@@ -137,6 +137,18 @@ export async function buildPool(size = 50) {
   return out;
 }
 
+// Paginated feed for Rank Mode's infinite scroll. Interleaves movie + tv popular
+// pages by `mode`. Returns [] when there are no more results (end of catalog).
+export async function feedPage(page = 1, mode = 'both') {
+  if (isDemoMode()) return mock.feedPage(page, mode);
+  const types = mode === 'tv' ? ['tv'] : mode === 'movie' ? ['movie'] : ['movie', 'tv'];
+  const lists = await Promise.all(types.map((t) => popular(t, page)));
+  const max = Math.max(0, ...lists.map((l) => l.length));
+  const out = [];
+  for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
+  return out;
+}
+
 export async function watchProviders(id, type) {
   if (isDemoMode()) return mock.watchProviders(id, type);
   try {
