@@ -7,7 +7,7 @@ const ITEMS = [
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export default function NavDrawer({ open, current, onNavigate, onClose }) {
+export default function NavDrawer({ open, current, onNavigate, onClose, user, onLogout }) {
   return (
     <AnimatePresence>
       {open && (
@@ -19,7 +19,7 @@ export default function NavDrawer({ open, current, onNavigate, onClose }) {
           onClick={onClose}
         >
           <motion.nav
-            className="absolute right-0 top-0 h-full w-64 border-l border-border bg-surface p-5"
+            className="absolute right-0 top-0 flex h-full w-64 flex-col border-l border-border bg-surface p-5"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -32,7 +32,7 @@ export default function NavDrawer({ open, current, onNavigate, onClose }) {
                 ✕
               </button>
             </div>
-            <ul className="space-y-1">
+            <ul className="flex-1 space-y-1">
               {ITEMS.map((item) => (
                 <li key={item.id}>
                   <button
@@ -52,6 +52,18 @@ export default function NavDrawer({ open, current, onNavigate, onClose }) {
                 </li>
               ))}
             </ul>
+
+            {user && (
+              <div className="border-t border-border pt-3">
+                <p className="truncate px-3 text-sm text-sub">{user.name || user.email}</p>
+                <button
+                  onClick={onLogout}
+                  className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sub hover:bg-bg hover:text-txt"
+                >
+                  ⎋ Sign out
+                </button>
+              </div>
+            )}
           </motion.nav>
         </motion.div>
       )}

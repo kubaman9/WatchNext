@@ -42,6 +42,41 @@ Get a free key at https://www.themoviedb.org/settings/api.
 
 All state persists to `localStorage` under `watchnext_state`.
 
+## Accounts & cloud sync
+
+Sign-in is backed by **MongoDB** via serverless API routes in [`/api`](api):
+
+- `POST /api/auth/signup` · `POST /api/auth/login` · `GET /api/auth/me`
+- `GET /api/state` · `PUT /api/state` — per-user WatchNext data
+
+Passwords are hashed with bcrypt; sessions are JWTs stored in `localStorage`.
+On sign-in your list/taste loads from MongoDB and syncs back on every change, so
+your account follows you across devices.
+
+## Deploy (Vercel)
+
+This is a full-stack app (Vite frontend + serverless API). Deploy on Vercel:
+
+1. Push to GitHub (already wired): `git push -u origin main`.
+2. On [vercel.com](https://vercel.com) → **New Project** → import `kubaman9/WatchNext`.
+3. Set **Environment Variables**:
+   - `MONGODB_URI` — your MongoDB Atlas connection string
+   - `JWT_SECRET` — any long random string
+4. Deploy. Vercel auto-detects Vite and serves `/api/*` as functions.
+
+> ⚠️ **Never commit `MONGODB_URI` or `JWT_SECRET`.** They live only in Vercel's
+> env settings. If a connection string is ever exposed, rotate the DB password
+> in Atlas immediately.
+
+### Local full-stack dev
+
+```bash
+npm i -g vercel
+vercel dev          # runs frontend + /api with your env vars
+```
+
+Plain `npm run dev` runs only the frontend (auth calls will fail without the API).
+
 ## Scripts
 
 - `npm run dev` — dev server
