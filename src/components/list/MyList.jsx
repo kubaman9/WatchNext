@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import TitleDetail from './TitleDetail';
 import TypeBadge from '../shared/TypeBadge';
@@ -17,9 +18,10 @@ const SORTS = {
 };
 
 export default function MyList({ onExit }) {
-  const { watched } = useTitles();
+  const { state, dispatch } = useApp();
+  const { watched, rankOf, ratingOf } = useTitles();
   const [sort, setSort] = useState('rank');
-  const [mode, setMode] = useState('both');
+  const mode = state.settings.mode || 'both';
   const [q, setQ] = useState('');
   const [detail, setDetail] = useState(null);
 
@@ -32,10 +34,6 @@ export default function MyList({ onExit }) {
     else if (sort === 'az') list = [...list].sort((a, b) => a.title.localeCompare(b.title));
     return list;
   }, [watched, sort, mode, q]);
-
-  function rankOf(id) {
-    return watched.findIndex((t) => t.id === id) + 1;
-  }
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl px-5 py-5">
@@ -65,7 +63,11 @@ export default function MyList({ onExit }) {
             {label}
           </button>
         ))}
-        <ModeToggle value={mode} onChange={setMode} className="ml-auto" />
+        <ModeToggle
+          value={mode}
+          onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })}
+          className="ml-auto"
+        />
       </div>
 
       {!rows.length && <p className="mt-10 text-center text-sub">Nothing ranked yet.</p>}
@@ -94,6 +96,12 @@ export default function MyList({ onExit }) {
                     {t.year || '—'} · {(t.genres || []).slice(0, 2).join(', ')}
                   </span>
                 </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block font-display text-lg text-accent">
+                  {ratingOf(t.id)?.toFixed(1) ?? '—'}
+                </span>
+                <span className="block text-[10px] uppercase tracking-wide text-neutral">/ 5</span>
               </span>
             </button>
           </li>

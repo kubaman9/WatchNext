@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import GenreBadge from '../shared/GenreBadge';
 import TypeBadge from '../shared/TypeBadge';
+import ModeToggle from '../shared/ModeToggle';
 import Overlay from '../shared/Overlay';
 import PostWatchRanking from './PostWatchRanking';
 
@@ -28,27 +29,43 @@ function rerankInterval(libraryCount) {
 
 export default function RankMode({ onExit }) {
   const { state, dispatch } = useApp();
+  const mode = state.settings.mode || 'both';
+
+  function inMode(t) {
+    return mode === 'both' || t.type === mode;
+  }
 
   // Build a randomized queue from Watch Later on mount — never sorted the same way twice.
   const queueRef = useRef(null);
+  const modeRef = useRef(mode);
   const [queueIdx, setQueueIdx] = useState(0);
   const [flow, setFlow] = useState(null); // { title, kind: 'place' | 'rerank' }
   const [count, setCount] = useState(0);
   const sinceRerank = useRef(0);
 
   if (queueRef.current === null) {
-    const watchLater = state.titles.filter((t) => !t.watched && !t.disliked);
+    const watchLater = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t));
     queueRef.current = shuffle(watchLater);
   }
+
+  // Rebuild the queue whenever the global Movie/TV/All mode changes.
+  useEffect(() => {
+    if (modeRef.current === mode) return;
+    modeRef.current = mode;
+    const watchLater = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t));
+    queueRef.current = shuffle(watchLater);
+    setQueueIdx(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const queue = queueRef.current;
 
   // Resolve current card against live state so changes (watched/disliked elsewhere) are reflected.
   const rawCard = queue[queueIdx] ?? null;
   const liveCard = rawCard ? (state.titles.find((t) => t.id === rawCard.id) ?? rawCard) : null;
-  const card = liveCard && !liveCard.watched && !liveCard.disliked ? liveCard : null;
+  const card = liveCard && !liveCard.watched && !liveCard.disliked && inMode(liveCard) ? liveCard : null;
 
-  // Skip cards that became stale (watched/disliked outside this screen).
+  // Skip cards that became stale (watched/disliked outside this screen, or filtered by mode).
   useEffect(() => {
     if (rawCard && !card && !flow) {
       setQueueIdx((n) => n + 1);
@@ -58,19 +75,20 @@ export default function RankMode({ onExit }) {
   // When the queue runs out, reshuffle any remaining Watch Later items for a continuous feed.
   useEffect(() => {
     if (queueIdx >= queue.length && !flow) {
-      const remaining = state.titles.filter((t) => !t.watched && !t.disliked);
+      const remaining = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t));
       if (remaining.length > 0) {
         queueRef.current = shuffle(remaining);
         setQueueIdx(0);
       }
     }
-  }, [queueIdx, flow, queue.length, state.titles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueIdx, flow, queue.length, state.titles, mode]);
 
-  const watchLaterCount = state.titles.filter((t) => !t.watched && !t.disliked).length;
+  const watchLaterCount = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t)).length;
   const exhausted = queueIdx >= queue.length && watchLaterCount === 0;
 
   function maybeRerank() {
-    const lib = state.titles.filter((t) => t.watched && !t.disliked);
+    const lib = state.titles.filter((t) => t.watched && !t.disliked && inMode(t));
     if (lib.length < 4) return false;
     sinceRerank.current += 1;
     if (sinceRerank.current >= rerankInterval(lib.length)) {
@@ -83,7 +101,7 @@ export default function RankMode({ onExit }) {
   }
 
   function triggerRerank() {
-    const lib = state.titles.filter((t) => t.watched && !t.disliked);
+    const lib = state.titles.filter((t) => t.watched && !t.disliked && inMode(t));
     if (!lib.length) return;
     const pick = lib[Math.floor(Math.random() * lib.length)];
     setFlow({ title: pick, kind: 'rerank' });
@@ -161,6 +179,12 @@ export default function RankMode({ onExit }) {
         </span>
       </div>
 
+      <ModeToggle
+        value={mode}
+        onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })}
+        className="mx-auto mt-3"
+      />
+
       <div className="flex flex-1 flex-col items-center justify-center">
         {!card && !exhausted && (
           <div className="h-[60vh] w-full animate-pulse rounded-xl bg-surface" />
@@ -172,7 +196,7 @@ export default function RankMode({ onExit }) {
               {count > 0 ? `${count} ranked this session. ` : ''}
               Add more titles, or keep calibrating your rankings.
             </p>
-            {state.titles.filter((t) => t.watched && !t.disliked).length >= 4 && (
+            {state.titles.filter((t) => t.watched && !t.disliked && inMode(t)).length >= 4 && (
               <button
                 onClick={triggerRerank}
                 className="mt-5 rounded-xl bg-accent px-6 py-3 font-semibold text-white active:scale-95"

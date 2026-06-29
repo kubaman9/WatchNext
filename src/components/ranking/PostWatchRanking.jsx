@@ -28,7 +28,7 @@ function roundsFor(title, listedCount, taste, thorough) {
 // thorough prop: triggers longer comparison set (from MyList re-rank flow)
 export default function PostWatchRanking({ title, onDone, thorough = false }) {
   const { state, dispatch } = useApp();
-  const { watched, opponents, rankOf, neighbors, seedElo } = useTitles();
+  const { watched, opponents, rankOf, neighbors, seedElo, ratingOf } = useTitles();
   const [round, setRound] = useState(0);
   const [done, setDone] = useState(false);
   const usedIds = useRef([]);
@@ -116,6 +116,7 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
 
   if (done) {
     const rank = rankOf(title.id);
+    const rating = ratingOf(title.id);
     const { above, below } = neighbors(title.id);
     return (
       <motion.div
@@ -126,6 +127,9 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
         <div className="font-display text-3xl text-txt">
           {title.title} lands at {rank ? `#${rank}` : 'your list'}
         </div>
+        {rating != null && (
+          <div className="font-display text-xl text-accent">{rating.toFixed(1)} / 5</div>
+        )}
         <div className="text-sm text-sub">
           {below && <span>↑ above {below.title}</span>}
           {above && below && <span> · </span>}

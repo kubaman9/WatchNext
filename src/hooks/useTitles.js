@@ -35,5 +35,20 @@ export function useTitles() {
       .map((x) => x.t);
   }
 
-  return { titles, watched, rankOf, neighbors, seedElo, opponents };
+  // Rating out of 5 (one decimal), min-max normalized off Elo across the whole
+  // watched list — top of your list lands at 5.0, bottom at 1.0. Rank number
+  // (not this rounded value) is the real tiebreaker when two titles round the same.
+  function ratingOf(id) {
+    if (!watched.length) return null;
+    const t = watched.find((x) => x.id === id);
+    if (!t) return null;
+    const elos = watched.map((x) => x.eloScore ?? 1000);
+    const min = Math.min(...elos);
+    const max = Math.max(...elos);
+    if (max === min) return 5.0;
+    const norm = ((t.eloScore ?? 1000) - min) / (max - min);
+    return Math.round((1 + norm * 4) * 10) / 10;
+  }
+
+  return { titles, watched, rankOf, neighbors, seedElo, opponents, ratingOf };
 }

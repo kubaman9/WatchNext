@@ -15,7 +15,7 @@ const FALLBACK =
 
 export default function TitleDetail({ title, onClose }) {
   const { dispatch } = useApp();
-  const { rankOf } = useTitles();
+  const { rankOf, ratingOf } = useTitles();
   const [reranking, setReranking] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -59,6 +59,9 @@ export default function TitleDetail({ title, onClose }) {
               </div>
               <div className="mt-3 flex gap-4 text-sm text-sub">
                 <span>#{rankOf(title.id) || '—'}</span>
+                <span className="font-semibold text-accent">
+                  {ratingOf(title.id)?.toFixed(1) ?? '—'} / 5
+                </span>
                 <span>Elo {title.eloScore}</span>
                 <span>
                   {title.wins || 0}W / {title.losses || 0}L

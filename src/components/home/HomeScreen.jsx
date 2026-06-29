@@ -7,6 +7,7 @@ import PostWatchRanking from '../ranking/PostWatchRanking';
 import Overlay from '../shared/Overlay';
 import SearchSheet from '../shared/SearchSheet';
 import PosterCard from '../shared/PosterCard';
+import ModeToggle from '../shared/ModeToggle';
 
 function greeting() {
   const h = new Date().getHours();
@@ -16,7 +17,7 @@ function greeting() {
 }
 
 export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const { topPoster } = useRecommendation();
   const { watched, rankOf } = useTitles();
 
@@ -63,6 +64,11 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
 
         <main className="flex flex-1 flex-col items-center justify-center px-5 text-center">
           <p className="mb-5 font-display text-2xl text-sub">{greeting()}</p>
+          <ModeToggle
+            value={state.settings.mode || 'both'}
+            onChange={(mode) => dispatch({ type: 'SET_SETTINGS', payload: { mode } })}
+            className="mb-6"
+          />
           <button
             onClick={() => onNavigate('rank')}
             className="min-h-[64px] w-full max-w-[400px] rounded-2xl bg-accent px-8 py-5 font-display text-2xl text-white shadow-glow transition-shadow hover:shadow-[0_0_60px_-6px_rgba(109,40,217,0.8)] active:scale-[0.98]"
