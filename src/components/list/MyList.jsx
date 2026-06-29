@@ -1,0 +1,97 @@
+import { useMemo, useState } from 'react';
+import { useTitles } from '../../hooks/useTitles';
+import TitleDetail from './TitleDetail';
+
+const FALLBACK =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="120"><rect width="100%" height="100%" fill="#13131A"/></svg>`
+  );
+
+const SORTS = {
+  rank: 'Rank',
+  recent: 'Recently Watched',
+  az: 'A–Z',
+};
+
+export default function MyList({ onExit }) {
+  const { watched } = useTitles();
+  const [sort, setSort] = useState('rank');
+  const [q, setQ] = useState('');
+  const [detail, setDetail] = useState(null);
+
+  const rows = useMemo(() => {
+    let list = watched.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
+    if (sort === 'recent')
+      list = [...list].sort((a, b) => (b.watchedDate || '').localeCompare(a.watchedDate || ''));
+    else if (sort === 'az') list = [...list].sort((a, b) => a.title.localeCompare(b.title));
+    return list;
+  }, [watched, sort, q]);
+
+  function rankOf(id) {
+    return watched.findIndex((t) => t.id === id) + 1;
+  }
+
+  return (
+    <div className="mx-auto min-h-screen max-w-2xl px-5 py-5">
+      <div className="flex items-center gap-3">
+        <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
+          ←
+        </button>
+        <h1 className="font-display text-2xl text-txt">My List</h1>
+      </div>
+
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search your list…"
+        className="mt-4 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-txt outline-none focus:border-accent"
+      />
+
+      <div className="mt-3 flex gap-2">
+        {Object.entries(SORTS).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setSort(k)}
+            className={`rounded-full px-3 py-1 text-sm ${
+              sort === k ? 'bg-accent text-white' : 'border border-border text-sub'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {!rows.length && <p className="mt-10 text-center text-sub">Nothing ranked yet.</p>}
+
+      <ul className="mt-4 space-y-2">
+        {rows.map((t) => (
+          <li key={t.id}>
+            <button
+              onClick={() => setDetail(t)}
+              className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-2 text-left hover:border-accent"
+            >
+              <span className="w-8 shrink-0 text-center font-display text-lg text-sub">
+                #{rankOf(t.id)}
+              </span>
+              <img
+                src={t.poster || FALLBACK}
+                alt={t.title}
+                onError={(e) => (e.currentTarget.src = FALLBACK)}
+                className="h-16 w-11 shrink-0 rounded object-cover"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-txt">{t.title}</span>
+                <span className="block text-sm text-sub">
+                  {t.year || '—'} · {(t.genres || []).slice(0, 2).join(', ')}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {detail && <TitleDetail title={detail} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
