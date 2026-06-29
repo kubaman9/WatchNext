@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { feedPage } from '../../services/tmdbApi';
 import GenreBadge from '../shared/GenreBadge';
 import TypeBadge from '../shared/TypeBadge';
 import Overlay from '../shared/Overlay';
@@ -13,81 +12,62 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
-const BUFFER = 5; // fetch more when this close to the end
-// Re-rank an existing title roughly every N classifications, more often as the
-// library grows (so big lists stay calibrated). Clamped to a sane range.
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Trigger a re-rank of an existing watched title more often as library grows.
 function rerankInterval(libraryCount) {
   return Math.min(8, Math.max(4, 12 - Math.floor(libraryCount / 8)));
 }
 
 export default function RankMode({ onExit }) {
   const { state, dispatch } = useApp();
-  const [feed, setFeed] = useState([]);
-  const [i, setI] = useState(0);
-  const [count, setCount] = useState(0);
+
+  // Build a randomized queue from Watch Later on mount — never sorted the same way twice.
+  const queueRef = useRef(null);
+  const [queueIdx, setQueueIdx] = useState(0);
   const [flow, setFlow] = useState(null); // { title, kind: 'place' | 'rerank' }
-  const [loading, setLoading] = useState(true);
-  const [exhausted, setExhausted] = useState(false);
-
-  const mode = useRef(state.settings.mode || 'both');
-  const knownIds = useRef(new Set());
-  const page = useRef(0);
-  const loadingMore = useRef(false);
-  const exhaustedRef = useRef(false);
+  const [count, setCount] = useState(0);
   const sinceRerank = useRef(0);
-  const started = useRef(false);
 
-  // Pull the next page(s) of fresh titles, skipping anything already shown or
-  // already classified. Keeps the feed effectively infinite on live TMDB.
-  const ensureBuffer = useCallback(async () => {
-    if (loadingMore.current || exhaustedRef.current) return;
-    loadingMore.current = true;
-    try {
-      let added = 0;
-      let empties = 0;
-      while (added < 12 && empties < 2) {
-        page.current += 1;
-        const titles = await feedPage(page.current, mode.current);
-        if (!titles.length) {
-          exhaustedRef.current = true;
-          setExhausted(true);
-          break;
-        }
-        const fresh = titles.filter(
-          (t) =>
-            !knownIds.current.has(t.id) &&
-            (mode.current === 'both' || t.type === mode.current)
-        );
-        if (!fresh.length) {
-          empties += 1;
-          continue;
-        }
-        fresh.forEach((t) => knownIds.current.add(t.id));
-        setFeed((f) => [...f, ...fresh]);
-        added += fresh.length;
-      }
-    } finally {
-      loadingMore.current = false;
+  if (queueRef.current === null) {
+    const watchLater = state.titles.filter((t) => !t.watched && !t.disliked);
+    queueRef.current = shuffle(watchLater);
+  }
+
+  const queue = queueRef.current;
+
+  // Resolve current card against live state so changes (watched/disliked elsewhere) are reflected.
+  const rawCard = queue[queueIdx] ?? null;
+  const liveCard = rawCard ? (state.titles.find((t) => t.id === rawCard.id) ?? rawCard) : null;
+  const card = liveCard && !liveCard.watched && !liveCard.disliked ? liveCard : null;
+
+  // Skip cards that became stale (watched/disliked outside this screen).
+  useEffect(() => {
+    if (rawCard && !card && !flow) {
+      setQueueIdx((n) => n + 1);
     }
-  }, []);
+  }, [rawCard, card, flow]);
 
-  // Initial load: seed known ids from already-classified titles, then fill.
+  // When the queue runs out, reshuffle any remaining Watch Later items for a continuous feed.
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    state.titles
-      .filter((t) => t.watched || t.disliked)
-      .forEach((t) => knownIds.current.add(t.id));
-    ensureBuffer().then(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (queueIdx >= queue.length && !flow) {
+      const remaining = state.titles.filter((t) => !t.watched && !t.disliked);
+      if (remaining.length > 0) {
+        queueRef.current = shuffle(remaining);
+        setQueueIdx(0);
+      }
+    }
+  }, [queueIdx, flow, queue.length, state.titles]);
 
-  // Top up the buffer as the user nears the end.
-  useEffect(() => {
-    if (!loading && i >= feed.length - BUFFER) ensureBuffer();
-  }, [i, feed.length, loading, ensureBuffer]);
-
-  const card = feed[i];
+  const watchLaterCount = state.titles.filter((t) => !t.watched && !t.disliked).length;
+  const exhausted = queueIdx >= queue.length && watchLaterCount === 0;
 
   function maybeRerank() {
     const lib = state.titles.filter((t) => t.watched && !t.disliked);
@@ -102,27 +82,42 @@ export default function RankMode({ onExit }) {
     return false;
   }
 
-  function seen() {
+  function triggerRerank() {
+    const lib = state.titles.filter((t) => t.watched && !t.disliked);
+    if (!lib.length) return;
+    const pick = lib[Math.floor(Math.random() * lib.length)];
+    setFlow({ title: pick, kind: 'rerank' });
+  }
+
+  function advance() {
+    setCount((c) => c + 1);
+    setQueueIdx((n) => n + 1);
+  }
+
+  function seenIt() {
     if (!card || flow) return;
-    dispatch({ type: 'ADD_TITLE', title: { ...card, watched: false } });
+    if (!state.titles.find((t) => t.id === card.id)) {
+      dispatch({ type: 'ADD_TITLE', title: { ...card, watched: false } });
+    }
     dispatch({ type: 'MARK_WATCHED', id: card.id });
     setFlow({ title: card, kind: 'place' });
   }
 
-  function pass() {
+  function haventSeen() {
+    // Item stays on Watch Later; advance without any state change.
     if (!card || flow) return;
-    dispatch({ type: 'ADD_TITLE', title: card });
-    dispatch({ type: 'DISLIKE_TITLE', id: card.id });
-    setCount((c) => c + 1);
-    setI((n) => n + 1);
+    if (!state.titles.find((t) => t.id === card.id)) {
+      dispatch({ type: 'ADD_TITLE', title: card });
+    }
+    advance();
     maybeRerank();
   }
 
-  function addToList() {
+  function pass() {
+    // Not interested — mark disliked and remove from Watch Later.
     if (!card || flow) return;
-    dispatch({ type: 'ADD_TITLE', title: card });
-    setCount((c) => c + 1);
-    setI((n) => n + 1);
+    dispatch({ type: 'DISLIKE_TITLE', id: card.id });
+    advance();
     maybeRerank();
   }
 
@@ -130,8 +125,7 @@ export default function RankMode({ onExit }) {
     const f = flow;
     setFlow(null);
     if (f?.kind === 'place') {
-      setCount((c) => c + 1);
-      setI((n) => n + 1);
+      advance();
       maybeRerank();
     }
   }
@@ -139,9 +133,9 @@ export default function RankMode({ onExit }) {
   useEffect(() => {
     function onKey(e) {
       if (flow) return;
-      if (e.key === 'ArrowRight') seen();
+      if (e.key === 'ArrowRight') seenIt();
       else if (e.key === 'ArrowLeft') pass();
-      else if (e.key === 'ArrowUp') addToList();
+      else if (e.key === 'ArrowUp') haventSeen();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -151,8 +145,8 @@ export default function RankMode({ onExit }) {
   function onDragEnd(_, info) {
     if (flow) return;
     const { x, y } = info.offset;
-    if (y < -120) addToList();
-    else if (x > 120) seen();
+    if (y < -120) haventSeen();
+    else if (x > 120) seenIt();
     else if (x < -120) pass();
   }
 
@@ -163,18 +157,32 @@ export default function RankMode({ onExit }) {
           ←
         </button>
         <span className="text-sm text-sub">
-          {count > 0 ? `${count} ranked this session` : 'Rank Titles'}
+          {count > 0 ? `${count} ranked this session` : 'Your Watch List'}
         </span>
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center">
-        {loading && <div className="h-[60vh] w-full animate-pulse rounded-xl bg-surface" />}
-        {!loading && !card && (
-          <div className="text-center text-sub">
-            <p className="font-display text-2xl text-txt">All caught up.</p>
-            <p className="mt-1">{count} ranked this session — recommendations sharpened.</p>
+        {!card && !exhausted && (
+          <div className="h-[60vh] w-full animate-pulse rounded-xl bg-surface" />
+        )}
+        {exhausted && (
+          <div className="text-center">
+            <p className="font-display text-2xl text-txt">Watch Later is empty.</p>
+            <p className="mt-1 text-sub">
+              {count > 0 ? `${count} ranked this session. ` : ''}
+              Add more titles, or keep calibrating your rankings.
+            </p>
+            {state.titles.filter((t) => t.watched && !t.disliked).length >= 4 && (
+              <button
+                onClick={triggerRerank}
+                className="mt-5 rounded-xl bg-accent px-6 py-3 font-semibold text-white active:scale-95"
+              >
+                Re-rank Existing Titles
+              </button>
+            )}
           </div>
         )}
+
         <AnimatePresence mode="wait">
           {card && (
             <motion.div
@@ -213,23 +221,29 @@ export default function RankMode({ onExit }) {
 
       {card && (
         <div className="flex flex-col gap-3 pb-2">
+          <button
+            onClick={haventSeen}
+            className="w-full rounded-xl border border-accent bg-surface py-4 font-semibold text-accent active:scale-95"
+          >
+            Haven't Seen It — Keep on Watch Later
+          </button>
           <div className="flex gap-3">
             <button
-              onClick={seen}
+              onClick={seenIt}
               className="flex-1 rounded-xl bg-win py-3 font-semibold text-white active:scale-95"
             >
-              ✓ Seen
+              Just Watched It
             </button>
             <button
               onClick={pass}
               className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub active:scale-95"
             >
-              ✕ Pass
+              Pass
             </button>
           </div>
-          <button onClick={addToList} className="text-sm text-sub hover:text-txt">
-            ↑ Haven’t seen, add to list
-          </button>
+          <p className="text-center text-xs text-neutral">
+            Ranking your list · not a recommendations feed
+          </p>
         </div>
       )}
 
@@ -243,10 +257,6 @@ export default function RankMode({ onExit }) {
           </Overlay>
         )}
       </AnimatePresence>
-
-      {!loading && exhausted && card && (
-        <p className="pb-1 text-center text-xs text-neutral">End of the catalog is near.</p>
-      )}
     </div>
   );
 }

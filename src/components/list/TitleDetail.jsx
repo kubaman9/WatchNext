@@ -110,7 +110,7 @@ export default function TitleDetail({ title, onClose }) {
 
         {reranking && (
           <Overlay key="rerank">
-            <PostWatchRanking title={title} onDone={() => setReranking(false)} />
+            <PostWatchRanking title={title} onDone={() => setReranking(false)} thorough />
           </Overlay>
         )}
       </motion.div>

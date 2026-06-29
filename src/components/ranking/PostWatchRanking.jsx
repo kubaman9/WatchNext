@@ -4,30 +4,51 @@ import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import BattleArena from '../shared/BattleArena';
 
-// Battle count scales with library size (binary-search style) so larger lists
-// place titles more precisely. 3 battles at small sizes, up to 7 for big lists.
-function roundsFor(libraryCount) {
-  return Math.min(7, Math.max(3, Math.ceil(Math.log2(libraryCount + 1))));
+// Dynamic round count based on library size and genre signal strength.
+// thorough=true (from MyList re-rank) runs a longer, scaled set.
+function roundsFor(title, listedCount, taste, thorough) {
+  const base = Math.min(7, Math.max(3, Math.ceil(Math.log2(listedCount + 1))));
+  if (thorough) return Math.min(12, Math.round(base * 1.5));
+
+  const genreWeights = taste.genreWeights || {};
+  const genreIds = title.genreIds || [];
+  if (!genreIds.length || listedCount < 4) return base;
+
+  const avgWeight = genreIds.reduce((s, id) => s + (genreWeights[id] ?? 1.0), 0) / genreIds.length;
+  const deviation = Math.abs(avgWeight - 1.0);
+
+  // Strong genre signal = we know our taste here → fewer battles needed
+  if (deviation > 0.4 && listedCount > 10) return Math.max(2, base - 1);
+  // Weak/unknown genre signal → more battles to calibrate
+  if (deviation < 0.15 && listedCount > 5) return Math.min(9, base + 1);
+
+  return base;
 }
 
-// Places a freshly-watched (or re-ranked) title via Elo battles, then shows where it landed.
-export default function PostWatchRanking({ title, onDone }) {
-  const { dispatch } = useApp();
+// thorough prop: triggers longer comparison set (from MyList re-rank flow)
+export default function PostWatchRanking({ title, onDone, thorough = false }) {
+  const { state, dispatch } = useApp();
   const { watched, opponents, rankOf, neighbors, seedElo } = useTitles();
   const [round, setRound] = useState(0);
   const [done, setDone] = useState(false);
   const usedIds = useRef([]);
   const seeded = useRef(false);
-  // Elo of opponents this title beat / lost to, captured at battle time. Used to
-  // place the title strictly between them so it never outranks something it lost to.
   const beatElos = useRef([]);
   const lostElos = useRef([]);
-  // Fix the round count once at start so it can't shift mid-flow.
+
+  // Fix round count once at start so it can't shift mid-flow.
   const totalRef = useRef(null);
+  const cascadeRef = useRef(null);
   if (totalRef.current === null) {
-    totalRef.current = roundsFor(watched.filter((t) => t.id !== title.id).length);
+    const listedCount = watched.filter((t) => t.id !== title.id).length;
+    totalRef.current = roundsFor(title, listedCount, state.taste, thorough);
+    // +2 cascade verification rounds: re-battle the bracket boundaries to fix
+    // neighbor ordering bugs caused by insertion — only when library is big enough.
+    cascadeRef.current = listedCount >= 4 ? 2 : 0;
   }
   const TOTAL = totalRef.current;
+  const CASCADE = cascadeRef.current;
+  const GRAND_TOTAL = TOTAL + CASCADE;
 
   // Seed starting Elo from genre affinity once, before first battle.
   useEffect(() => {
@@ -47,14 +68,13 @@ export default function PostWatchRanking({ title, onDone }) {
     [round]
   );
 
-  // No opponents to compare against — nothing to rank, just finish.
   useEffect(() => {
-    if (!opponent && round < TOTAL && !done) finish();
+    if (!opponent && round < GRAND_TOTAL && !done) finish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opponent]);
 
   function next() {
-    if (round + 1 >= TOTAL) finish();
+    if (round + 1 >= GRAND_TOTAL) finish();
     else setRound((r) => r + 1);
   }
 
@@ -73,14 +93,14 @@ export default function PostWatchRanking({ title, onDone }) {
     next();
   }
 
-  // Override the title's Elo so it sits between the highest title it beat and the
-  // lowest title it lost to — keeps the ranked order consistent with the choices.
+  // Place the title strictly between the highest it beat and lowest it lost to.
+  // Re-applied after cascade rounds for maximum accuracy.
   function applyBracket() {
     const beat = beatElos.current;
     const lost = lostElos.current;
-    if (!beat.length && !lost.length) return; // no decisive battles — keep seed
-    const lower = beat.length ? Math.max(...beat) : null; // must rank above this
-    const upper = lost.length ? Math.min(...lost) : null; // must rank below this
+    if (!beat.length && !lost.length) return;
+    const lower = beat.length ? Math.max(...beat) : null;
+    const upper = lost.length ? Math.min(...lost) : null;
     let elo;
     if (lower != null && upper != null) elo = Math.round((lower + upper) / 2);
     else if (lower != null) elo = lower + 30;
@@ -118,15 +138,24 @@ export default function PostWatchRanking({ title, onDone }) {
 
   if (!opponent) return <p className="text-sub">Placing…</p>;
 
+  const inCascade = round >= TOTAL;
+
   return (
-    <BattleArena
-      left={live}
-      right={opponent}
-      prompt={`How does ${title.title} compare?`}
-      neitherLabel="Preferred neither"
-      progress={(round + 1) / TOTAL}
-      onPick={handlePick}
-      onNeither={handleNeither}
-    />
+    <>
+      {inCascade && (
+        <p className="mb-3 text-center text-xs uppercase tracking-wider text-sub">
+          Verifying placement…
+        </p>
+      )}
+      <BattleArena
+        left={live}
+        right={opponent}
+        prompt={`How does ${title.title} compare?`}
+        neitherLabel="Preferred neither"
+        progress={(round + 1) / GRAND_TOTAL}
+        onPick={handlePick}
+        onNeither={handleNeither}
+      />
+    </>
   );
 }

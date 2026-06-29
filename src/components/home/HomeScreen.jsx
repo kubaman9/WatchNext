@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useRecommendation } from '../../hooks/useRecommendation';
 import { useTitles } from '../../hooks/useTitles';
-import RevealCard from './RevealCard';
 import PostWatchRanking from '../ranking/PostWatchRanking';
 import Overlay from '../shared/Overlay';
 import SearchSheet from '../shared/SearchSheet';
 import PosterCard from '../shared/PosterCard';
-import ModeToggle from '../shared/ModeToggle';
 
 function greeting() {
   const h = new Date().getHours();
@@ -18,50 +16,14 @@ function greeting() {
 }
 
 export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
-  const { state, dispatch } = useApp();
-  const { pick, topPoster } = useRecommendation();
+  const { dispatch } = useApp();
+  const { topPoster } = useRecommendation();
   const { watched, rankOf } = useTitles();
 
-  const [reveal, setReveal] = useState(null);
-  const [skipStreak, setSkipStreak] = useState(0);
   const [ranking, setRanking] = useState(null);
   const [quickAdd, setQuickAdd] = useState(false);
   const [bg] = useState(() => topPoster());
   const autoFired = useRef(false);
-
-  // Fire the button automatically on first load after onboarding.
-  useEffect(() => {
-    if (autoFired.current) return;
-    autoFired.current = true;
-    if (state.taste.onboardingComplete && sessionStorage.getItem('wn_fired') !== '1') {
-      sessionStorage.setItem('wn_fired', '1');
-      const t = pick();
-      if (t) setReveal(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function fire() {
-    const t = pick();
-    setSkipStreak(0);
-    if (t) setReveal(t);
-    else onToast('Nothing left to recommend — add some titles!');
-  }
-
-  function handleSkip() {
-    dispatch({ type: 'SKIP_RECOMMENDATION', id: reveal.id });
-    setSkipStreak((s) => s + 1);
-    const t = pick();
-    setReveal(t || null);
-    if (!t) onToast('Out of fresh picks for now.');
-  }
-
-  function handleWatch() {
-    const t = reveal;
-    dispatch({ type: 'MARK_WATCHED', id: t.id });
-    setReveal(null);
-    setRanking(t);
-  }
 
   function quickAddSelect(title) {
     dispatch({ type: 'ADD_TITLE', title: { ...title, watched: false } });
@@ -101,19 +63,13 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
 
         <main className="flex flex-1 flex-col items-center justify-center px-5 text-center">
           <p className="mb-5 font-display text-2xl text-sub">{greeting()}</p>
-          <ModeToggle
-            value={state.settings.mode || 'both'}
-            onChange={(mode) => dispatch({ type: 'SET_SETTINGS', payload: { mode } })}
-            className="mb-6"
-          />
-          <motion.button
-            onClick={fire}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="min-h-[64px] w-full max-w-[400px] rounded-2xl bg-accent px-8 py-5 font-display text-2xl text-white shadow-glow transition-shadow hover:shadow-[0_0_60px_-6px_rgba(109,40,217,0.8)]"
+          <button
+            onClick={() => onNavigate('rank')}
+            className="min-h-[64px] w-full max-w-[400px] rounded-2xl bg-accent px-8 py-5 font-display text-2xl text-white shadow-glow transition-shadow hover:shadow-[0_0_60px_-6px_rgba(109,40,217,0.8)] active:scale-[0.98]"
           >
             🎬 What Should I Watch?
-          </motion.button>
+          </button>
+          <p className="mt-3 text-sm text-sub">Browse and rank your Watch Later list</p>
         </main>
 
         {watched.length > 0 && (
@@ -146,23 +102,6 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
           </button>
         </div>
       </div>
-
-      <AnimatePresence>
-        {reveal && (
-          <RevealCard
-            key="reveal"
-            title={reveal}
-            skipStreak={skipStreak}
-            onWatch={handleWatch}
-            onSkip={handleSkip}
-            onClose={() => setReveal(null)}
-            onRankNudge={() => {
-              setReveal(null);
-              onNavigate('rank');
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {ranking && (
