@@ -249,29 +249,26 @@ export default function RankMode({ onExit }) {
       {card && (
         <div className="shrink-0 space-y-2 pb-1">
           <p className="text-center text-sm text-sub">Have you seen this?</p>
+          <button
+            onClick={yes}
+            className="w-full rounded-xl bg-win py-3 font-semibold text-white active:scale-95"
+          >
+            Yes — rank it
+          </button>
           <div className="flex gap-2">
-            <button
-              onClick={yes}
-              className="flex-1 rounded-xl bg-win py-3 font-semibold text-white active:scale-95"
-            >
-              Yes
-            </button>
             <button
               onClick={no}
               className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent active:scale-95"
             >
-              No
+              Add to Watch Later
             </button>
             <button
               onClick={notInterested}
               className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub active:scale-95"
             >
-              Not for me
+              Not Interested
             </button>
           </div>
-          <p className="text-center text-[11px] text-neutral">
-            Yes = rank it · No = Watch Later · Not for me = hide
-          </p>
         </div>
       )}
 

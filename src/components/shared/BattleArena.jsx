@@ -52,6 +52,8 @@ export default function BattleArena({
   neitherLabel = 'Haven’t seen either',
   onPick,
   onNeither,
+  onMega,
+  megaLabel = '🔥 Mega prefer',
   progress,
 }) {
   const [picked, setPicked] = useState(null); // 'left' | 'right'
@@ -128,6 +130,15 @@ export default function BattleArena({
           />
         </motion.div>
       </AnimatePresence>
+      {onMega && (
+        <button
+          type="button"
+          onClick={onMega}
+          className="w-full max-w-xs rounded-full bg-gradient-to-r from-accent-deep via-accent to-gold py-2.5 text-sm font-semibold text-white shadow-glow active:scale-95"
+        >
+          {megaLabel}
+        </button>
+      )}
       {onNeither && (
         <button
           type="button"

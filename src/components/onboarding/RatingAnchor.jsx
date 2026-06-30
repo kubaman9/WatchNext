@@ -7,12 +7,6 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
-// Maps a 1–10 rating to a starting Elo so the scale is anchored to real taste
-// instead of everyone starting at a flat 1000.  10 → 1450, 5 → 950, 1 → 450.
-export function ratingToElo(rating) {
-  return Math.round(350 + rating * 110);
-}
-
 export default function RatingAnchor({ title, onDone }) {
   const [rating, setRating] = useState(7);
 

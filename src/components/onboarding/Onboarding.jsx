@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePool } from '../../hooks/useTmdb';
 import RecentlyWatched from './RecentlyWatched';
-import RatingAnchor, { ratingToElo } from './RatingAnchor';
+import RatingAnchor from './RatingAnchor';
 import TasteBattles from './TasteBattles';
+import { ratingToElo } from '../../utils/rating';
 
 export default function Onboarding({ onDone }) {
   const { dispatch } = useApp();
@@ -20,9 +21,12 @@ export default function Onboarding({ onDone }) {
     setStep('rate');
   }
 
-  // Anchor the scale to the first title's 1–10 rating.
+  // Anchor the scale to the first title's 1–10 rating: set its Elo and store the
+  // personal baseline that the rating engine centers every future placement on.
   function rateContinue(rating) {
-    if (recent[0]) dispatch({ type: 'SET_ELO', id: recent[0].id, elo: ratingToElo(rating) });
+    const elo = ratingToElo(rating);
+    if (recent[0]) dispatch({ type: 'SET_ELO', id: recent[0].id, elo });
+    dispatch({ type: 'SET_TASTE', payload: { baseline: elo } });
     setStep('battles');
   }
 

@@ -7,7 +7,7 @@ const AppContext = createContext(null);
 
 const initialState = {
   titles: [],
-  taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false },
+  taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false, baseline: 1000 },
   settings: { mode: 'both' }, // 'movie' | 'tv' | 'both'
   watchLater: [], // ordered array of title ids — user's manual Watch Later order
 };
@@ -76,6 +76,24 @@ function reducer(state, action) {
         t.id === action.id ? { ...t, eloScore: action.elo } : t
       );
       return { ...state, titles };
+    }
+
+    // Genre-only learning from a comparison (no Elo mutation) — used by the
+    // binary-insertion placement engine, which sets Elo directly via SET_ELO.
+    case 'LEARN_GENRES': {
+      const genreWeights = bumpGenreWeights(
+        state.taste.genreWeights,
+        action.up || [],
+        action.down || []
+      );
+      return {
+        ...state,
+        taste: {
+          ...state.taste,
+          genreWeights,
+          totalBattles: state.taste.totalBattles + 1,
+        },
+      };
     }
 
     case 'SKIP_RECOMMENDATION': {
@@ -149,7 +167,7 @@ function reducer(state, action) {
       return {
         ...state,
         titles,
-        taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false },
+        taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false, baseline: 1000 },
       };
     }
 

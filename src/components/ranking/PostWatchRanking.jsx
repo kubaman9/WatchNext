@@ -2,116 +2,140 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
+import { seedElo, estimateIndex, eloForIndex, randomPrompt } from '../../utils/rating';
 import BattleArena from '../shared/BattleArena';
 
-// Dynamic round count based on library size and genre signal strength.
-// thorough=true (from MyList re-rank) runs a longer, scaled set.
-function roundsFor(title, listedCount, taste, thorough) {
-  const base = Math.min(7, Math.max(3, Math.ceil(Math.log2(listedCount + 1))));
-  if (thorough) return Math.min(12, Math.round(base * 1.5));
-
-  const genreWeights = taste.genreWeights || {};
-  const genreIds = title.genreIds || [];
-  if (!genreIds.length || listedCount < 4) return base;
-
-  const avgWeight = genreIds.reduce((s, id) => s + (genreWeights[id] ?? 1.0), 0) / genreIds.length;
-  const deviation = Math.abs(avgWeight - 1.0);
-
-  // Strong genre signal = we know our taste here → fewer battles needed
-  if (deviation > 0.4 && listedCount > 10) return Math.max(2, base - 1);
-  // Weak/unknown genre signal → more battles to calibrate
-  if (deviation < 0.15 && listedCount > 5) return Math.min(9, base + 1);
-
-  return base;
-}
-
-// thorough prop: triggers longer comparison set (from MyList re-rank flow)
+// ── The one rating engine ─────────────────────────────────────────────────────
+// Every place a title gets ranked (Rank Mode "Yes", Home "Watch This"/quick-add,
+// Watch Later "Seen", My List re-rank) renders this component. It places a title
+// by binary insertion into the live ranked list:
+//   • multi-factor seed (baseline + genre affinity + TMDB popularity) chooses the
+//     first comparison, so we start near the likely spot
+//   • each comparison halves the candidate window → exact placement in ~log2(N)
+//   • randomized pivots + rotating prompts make every session feel fresh
+//   • one "🔥 Mega prefer" per session jumps the title to the top of the window
+//   • thorough mode (My List re-rank) adds boundary verification rounds
+// Placement is comparison-driven, so a title always lands above everything it beat
+// and below everything it lost to — no slow Elo convergence.
 export default function PostWatchRanking({ title, onDone, thorough = false }) {
   const { state, dispatch } = useApp();
-  const { watched, opponents, rankOf, neighbors, seedElo, ratingOf } = useTitles();
+  const { watched, rankOf, neighbors, ratingOf } = useTitles();
+
+  // Freeze the ranked snapshot (desc by Elo) for the whole session.
+  const rankedRef = useRef(null);
+  if (rankedRef.current === null) {
+    rankedRef.current = watched.filter((t) => t.id !== title.id);
+  }
+  const ranked = rankedRef.current;
+
+  const baseline = state.taste.baseline || 1000;
+  const seedRef = useRef(null);
+  if (seedRef.current === null) seedRef.current = seedElo(title, { taste: state.taste, baseline });
+
+  const lo = useRef(0);
+  const hi = useRef(ranked.length);
+  const verifyQueue = useRef(null); // indices to re-check in thorough mode
   const [round, setRound] = useState(0);
   const [done, setDone] = useState(false);
-  const usedIds = useRef([]);
-  const seeded = useRef(false);
-  const beatElos = useRef([]);
-  const lostElos = useRef([]);
+  const [megaUsed, setMegaUsed] = useState(false);
+  const estTotal = Math.max(1, Math.ceil(Math.log2(ranked.length + 1))) + (thorough ? 2 : 0);
 
-  // Fix round count once at start so it can't shift mid-flow.
-  const totalRef = useRef(null);
-  const cascadeRef = useRef(null);
-  if (totalRef.current === null) {
-    const listedCount = watched.filter((t) => t.id !== title.id).length;
-    totalRef.current = roundsFor(title, listedCount, state.taste, thorough);
-    // +2 cascade verification rounds: re-battle the bracket boundaries to fix
-    // neighbor ordering bugs caused by insertion — only when library is big enough.
-    cascadeRef.current = listedCount >= 4 ? 2 : 0;
-  }
-  const TOTAL = totalRef.current;
-  const CASCADE = cascadeRef.current;
-  const GRAND_TOTAL = TOTAL + CASCADE;
-
-  // Seed starting Elo from genre affinity once, before first battle.
-  useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    const current = watched.find((t) => t.id === title.id);
-    if (current && (current.wins || 0) + (current.losses || 0) === 0) {
-      dispatch({ type: 'SET_ELO', id: title.id, elo: seedElo(title) });
+  // Choose the opponent index for the current round.
+  const pivot = useMemo(() => {
+    if (verifyQueue.current && verifyQueue.current.length) return verifyQueue.current[0];
+    const L = lo.current;
+    const H = hi.current;
+    if (H - L <= 0) return -1;
+    if (round === 0) {
+      const si = estimateIndex(seedRef.current, ranked);
+      return Math.min(H - 1, Math.max(L, si >= H ? H - 1 : si));
     }
+    const jitter = thorough ? 0.08 : 0.32; // wider variety in normal sessions
+    const frac = 0.5 + (Math.random() - 0.5) * jitter;
+    return Math.min(H - 1, Math.max(L, Math.floor(L + (H - L) * frac)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [round]);
 
-  const live = watched.find((t) => t.id === title.id) || title;
-  const opponent = useMemo(
-    () => opponents(live, usedIds.current)[0] || null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [round]
-  );
+  const prompt = useMemo(() => randomPrompt(), [round]);
+  const opponent = pivot >= 0 ? ranked[pivot] : null;
 
+  // Window collapsed (or no opponents) → enter verify phase or finalize.
   useEffect(() => {
-    if (!opponent && round < GRAND_TOTAL && !done) finish();
+    if (done) return;
+    if (!opponent) {
+      if (thorough && verifyQueue.current === null && ranked.length) {
+        const idxs = [lo.current - 1, lo.current]
+          .filter((i) => i >= 0 && i < ranked.length);
+        if (idxs.length) {
+          verifyQueue.current = idxs;
+          setRound((r) => r + 1);
+          return;
+        }
+      }
+      finalizeAt(lo.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opponent]);
 
-  function next() {
-    if (round + 1 >= GRAND_TOTAL) finish();
-    else setRound((r) => r + 1);
+  function learn(newWins, opp) {
+    dispatch({
+      type: 'LEARN_GENRES',
+      up: newWins ? title.genreIds : opp.genreIds,
+      down: newWins ? opp.genreIds : title.genreIds,
+    });
   }
 
-  function handlePick(winner, loser) {
-    dispatch({ type: 'RECORD_BATTLE', winnerId: winner.id, loserId: loser.id });
-    if (opponent) {
-      if (winner.id === title.id) beatElos.current.push(opponent.eloScore);
-      else lostElos.current.push(opponent.eloScore);
-      usedIds.current.push(opponent.id);
+  function advance() {
+    setRound((r) => r + 1);
+  }
+
+  function handlePick(winner) {
+    const opp = opponent;
+    const newWins = winner.id === title.id;
+    learn(newWins, opp);
+
+    // Verify phase: nudge the final boundary if the user flips on a neighbor.
+    if (verifyQueue.current && verifyQueue.current.length) {
+      const idx = verifyQueue.current[0];
+      if (newWins && idx < lo.current) lo.current = idx;
+      if (!newWins && idx >= lo.current) lo.current = idx + 1;
+      verifyQueue.current = verifyQueue.current.slice(1);
+      if (!verifyQueue.current.length) {
+        finalizeAt(lo.current);
+        return;
+      }
+      advance();
+      return;
     }
-    next();
+
+    if (newWins) hi.current = pivot;
+    else lo.current = pivot + 1;
+    advance();
   }
 
   function handleNeither() {
-    if (opponent) usedIds.current.push(opponent.id);
-    next();
+    // Treat as "about equal" — settle right at the pivot.
+    if (verifyQueue.current && verifyQueue.current.length) {
+      verifyQueue.current = verifyQueue.current.slice(1);
+      if (!verifyQueue.current.length) return finalizeAt(lo.current);
+      return advance();
+    }
+    finalizeAt(pivot >= 0 ? pivot : lo.current);
   }
 
-  // Place the title strictly between the highest it beat and lowest it lost to.
-  // Re-applied after cascade rounds for maximum accuracy.
-  function applyBracket() {
-    const beat = beatElos.current;
-    const lost = lostElos.current;
-    if (!beat.length && !lost.length) return;
-    const lower = beat.length ? Math.max(...beat) : null;
-    const upper = lost.length ? Math.min(...lost) : null;
-    let elo;
-    if (lower != null && upper != null) elo = Math.round((lower + upper) / 2);
-    else if (lower != null) elo = lower + 30;
-    else elo = upper - 30;
+  // One-shot "I love this": jump to the top of the still-feasible window.
+  function handleMega() {
+    if (megaUsed || !opponent) return;
+    setMegaUsed(true);
+    learn(true, opponent);
+    finalizeAt(lo.current);
+  }
+
+  function finalizeAt(index) {
+    const elo = ranked.length ? eloForIndex(index, ranked) : seedRef.current;
     dispatch({ type: 'SET_ELO', id: title.id, elo });
-  }
-
-  function finish() {
-    applyBracket();
     setDone(true);
-    setTimeout(onDone, 2000);
+    setTimeout(onDone, 1800);
   }
 
   if (done) {
@@ -142,23 +166,26 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
 
   if (!opponent) return <p className="text-sub">Placing…</p>;
 
-  const inCascade = round >= TOTAL;
+  const verifying = verifyQueue.current && verifyQueue.current.length;
+  const progress = verifying ? 0.95 : Math.min(0.9, round / estTotal);
 
   return (
     <>
-      {inCascade && (
+      {verifying && (
         <p className="mb-3 text-center text-xs uppercase tracking-wider text-sub">
-          Verifying placement…
+          Double-checking placement…
         </p>
       )}
       <BattleArena
-        left={live}
+        left={title}
         right={opponent}
-        prompt={`How does ${title.title} compare?`}
-        neitherLabel="Preferred neither"
-        progress={(round + 1) / GRAND_TOTAL}
+        prompt={prompt}
+        neitherLabel="About the same"
+        progress={progress}
         onPick={handlePick}
         onNeither={handleNeither}
+        onMega={!megaUsed ? handleMega : undefined}
+        megaLabel={`🔥 Love ${title.title} — rank it high`}
       />
     </>
   );

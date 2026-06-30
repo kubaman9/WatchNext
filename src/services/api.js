@@ -8,7 +8,7 @@ export function setToken(t) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-async function req(path, { method = 'GET', body, auth = true } = {}) {
+async function req(path, { method = 'GET', body, auth = true, keepalive = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (auth) {
     const t = getToken();
@@ -18,6 +18,7 @@ async function req(path, { method = 'GET', body, auth = true } = {}) {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    keepalive, // lets the write survive a tab close / navigation
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -31,5 +32,6 @@ export const api = {
     req('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
   me: () => req('/auth/me'),
   getState: () => req('/state'),
-  putState: (state) => req('/state', { method: 'PUT', body: { state } }),
+  putState: (state, { keepalive = false } = {}) =>
+    req('/state', { method: 'PUT', body: { state }, keepalive }),
 };

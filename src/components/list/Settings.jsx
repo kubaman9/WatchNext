@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getApiKey, setApiKey, usingFallbackKey } from '../../services/tmdbApi';
+import { ratingToElo, eloToRating } from '../../utils/rating';
 import ModeToggle from '../shared/ModeToggle';
 
 export default function Settings({ onExit, onResetTaste }) {
   const { state, dispatch } = useApp();
   const [key, setKey] = useState(usingFallbackKey() ? '' : getApiKey());
   const [confirmReset, setConfirmReset] = useState(false);
+  const baseline = eloToRating(state.taste.baseline || 1000);
 
   function exportList() {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -24,7 +26,7 @@ export default function Settings({ onExit, onResetTaste }) {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-xl px-5 py-5">
+    <div className="mx-auto h-screen max-w-xl overflow-y-auto px-5 py-5">
       <div className="flex items-center gap-3">
         <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
           ←
@@ -39,6 +41,27 @@ export default function Settings({ onExit, onResetTaste }) {
           value={state.settings.mode || 'both'}
           onChange={(mode) => dispatch({ type: 'SET_SETTINGS', payload: { mode } })}
         />
+      </section>
+
+      <section className="mt-6 space-y-2">
+        <h2 className="text-sm uppercase tracking-wider text-sub">Baseline rating</h2>
+        <p className="text-sm text-sub">
+          Where your scale centers — the rating engine seeds every new title around this.
+        </p>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min="1"
+            max="10"
+            step="1"
+            value={baseline}
+            onChange={(e) =>
+              dispatch({ type: 'SET_TASTE', payload: { baseline: ratingToElo(Number(e.target.value)) } })
+            }
+            className="flex-1 accent-accent"
+          />
+          <span className="w-12 text-right font-display text-xl text-accent">{baseline}/10</span>
+        </div>
       </section>
 
       <section className="mt-6 space-y-2">
