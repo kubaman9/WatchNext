@@ -44,7 +44,7 @@ export default function RevealCard({ title, skipStreak, onWatch, onSkip, onClose
             src={title.poster || FALLBACK}
             alt={title.title}
             onError={(e) => (e.currentTarget.src = FALLBACK)}
-            className="max-h-[55vh] w-full object-cover"
+            className="max-h-[45vh] w-full object-cover"
           />
         </motion.div>
 

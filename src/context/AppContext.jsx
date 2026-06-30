@@ -9,6 +9,7 @@ const initialState = {
   titles: [],
   taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false },
   settings: { mode: 'both' }, // 'movie' | 'tv' | 'both'
+  watchLater: [], // ordered array of title ids — user's manual Watch Later order
 };
 
 function reducer(state, action) {
@@ -35,7 +36,8 @@ function reducer(state, action) {
           ? { ...t, watched: true, watchedDate: action.date || new Date().toISOString() }
           : t
       );
-      return { ...state, titles };
+      // Once watched it leaves the Watch Later queue.
+      return { ...state, titles, watchLater: state.watchLater.filter((id) => id !== action.id) };
     }
 
     case 'RECORD_BATTLE': {
@@ -43,7 +45,11 @@ function reducer(state, action) {
       const winner = state.titles.find((t) => t.id === winnerId);
       const loser = state.titles.find((t) => t.id === loserId);
       if (!winner || !loser) return state;
-      const [we, le] = updateElo(winner.eloScore, loser.eloScore);
+      let [we, le] = updateElo(winner.eloScore, loser.eloScore);
+      // Hard ordering guarantee: a title you just preferred must rank above the
+      // one it beat — immediately, even in an upset. Fixes slow convergence where
+      // the winner stayed below the loser for several more comparisons.
+      if (we <= le) we = le + 1;
       const titles = state.titles.map((t) => {
         if (t.id === winnerId) return { ...t, eloScore: we, wins: (t.wins || 0) + 1 };
         if (t.id === loserId) return { ...t, eloScore: le, losses: (t.losses || 0) + 1 };
@@ -89,11 +95,38 @@ function reducer(state, action) {
       const genreWeights = t
         ? bumpGenreWeights(state.taste.genreWeights, [], t.genreIds)
         : state.taste.genreWeights;
-      return { ...state, titles, taste: { ...state.taste, genreWeights } };
+      return {
+        ...state,
+        titles,
+        taste: { ...state.taste, genreWeights },
+        watchLater: state.watchLater.filter((id) => id !== action.id),
+      };
     }
 
+    case 'ADD_WATCH_LATER': {
+      if (state.watchLater.includes(action.id)) return state;
+      const titles = state.titles.map((t) =>
+        t.id === action.id ? { ...t, watchLater: true } : t
+      );
+      return { ...state, titles, watchLater: [...state.watchLater, action.id] };
+    }
+
+    case 'REMOVE_WATCH_LATER': {
+      const titles = state.titles.map((t) =>
+        t.id === action.id ? { ...t, watchLater: false } : t
+      );
+      return { ...state, titles, watchLater: state.watchLater.filter((id) => id !== action.id) };
+    }
+
+    case 'REORDER_WATCH_LATER':
+      return { ...state, watchLater: action.order };
+
     case 'REMOVE_TITLE':
-      return { ...state, titles: state.titles.filter((t) => t.id !== action.id) };
+      return {
+        ...state,
+        titles: state.titles.filter((t) => t.id !== action.id),
+        watchLater: state.watchLater.filter((id) => id !== action.id),
+      };
 
     case 'SET_TASTE':
       return { ...state, taste: { ...state.taste, ...action.payload } };

@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
+import { useTitles } from '../../hooks/useTitles';
+import { feedPage } from '../../services/tmdbApi';
 import GenreBadge from '../shared/GenreBadge';
 import TypeBadge from '../shared/TypeBadge';
 import ModeToggle from '../shared/ModeToggle';
 import Overlay from '../shared/Overlay';
 import PostWatchRanking from './PostWatchRanking';
+import RerankDuel from './RerankDuel';
 
 const FALLBACK =
   'data:image/svg+xml;utf8,' +
@@ -13,129 +16,142 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Trigger a re-rank of an existing watched title more often as library grows.
-function rerankInterval(libraryCount) {
-  return Math.min(8, Math.max(4, 12 - Math.floor(libraryCount / 8)));
+const BUFFER = 5;
+// Weave a re-rank of existing titles in more often as the library grows.
+function rerankInterval(lib) {
+  return Math.min(9, Math.max(5, 13 - Math.floor(lib / 8)));
 }
 
 export default function RankMode({ onExit }) {
   const { state, dispatch } = useApp();
+  const { watched } = useTitles();
   const mode = state.settings.mode || 'both';
 
-  function inMode(t) {
-    return mode === 'both' || t.type === mode;
-  }
-
-  // Build a randomized queue from Watch Later on mount — never sorted the same way twice.
-  const queueRef = useRef(null);
-  const modeRef = useRef(mode);
-  const [queueIdx, setQueueIdx] = useState(0);
-  const [flow, setFlow] = useState(null); // { title, kind: 'place' | 'rerank' }
+  const [feed, setFeed] = useState([]);
+  const [i, setI] = useState(0);
   const [count, setCount] = useState(0);
+  const [flow, setFlow] = useState(null); // { kind:'place', title } | { kind:'duel', a, b }
+  const [loading, setLoading] = useState(true);
+
+  const modeRef = useRef(mode);
+  const knownIds = useRef(new Set());
+  const page = useRef(0);
+  const loadingMore = useRef(false);
+  const exhausted = useRef(false);
   const sinceRerank = useRef(0);
+  const started = useRef(false);
 
-  if (queueRef.current === null) {
-    const watchLater = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t));
-    queueRef.current = shuffle(watchLater);
-  }
+  const ensureBuffer = useCallback(async () => {
+    if (loadingMore.current || exhausted.current) return;
+    loadingMore.current = true;
+    try {
+      let added = 0;
+      let empties = 0;
+      while (added < 12 && empties < 2) {
+        page.current += 1;
+        const titles = await feedPage(page.current, modeRef.current);
+        if (!titles.length) {
+          exhausted.current = true;
+          break;
+        }
+        const fresh = titles.filter(
+          (t) =>
+            !knownIds.current.has(t.id) &&
+            (modeRef.current === 'both' || t.type === modeRef.current)
+        );
+        if (!fresh.length) {
+          empties += 1;
+          continue;
+        }
+        fresh.forEach((t) => knownIds.current.add(t.id));
+        setFeed((f) => [...f, ...fresh]);
+        added += fresh.length;
+      }
+    } finally {
+      loadingMore.current = false;
+    }
+  }, []);
 
-  // Rebuild the queue whenever the global Movie/TV/All mode changes.
+  // Initial load — seed known ids from anything already classified.
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    state.titles
+      .filter((t) => t.watched || t.disliked || t.watchLater)
+      .forEach((t) => knownIds.current.add(t.id));
+    ensureBuffer().then(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Rebuild the feed when the Movie/TV/All mode changes.
   useEffect(() => {
     if (modeRef.current === mode) return;
     modeRef.current = mode;
-    const watchLater = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t));
-    queueRef.current = shuffle(watchLater);
-    setQueueIdx(0);
+    page.current = 0;
+    exhausted.current = false;
+    knownIds.current = new Set();
+    state.titles
+      .filter((t) => t.watched || t.disliked || t.watchLater)
+      .forEach((t) => knownIds.current.add(t.id));
+    setFeed([]);
+    setI(0);
+    setLoading(true);
+    ensureBuffer().then(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  const queue = queueRef.current;
-
-  // Resolve current card against live state so changes (watched/disliked elsewhere) are reflected.
-  const rawCard = queue[queueIdx] ?? null;
-  const liveCard = rawCard ? (state.titles.find((t) => t.id === rawCard.id) ?? rawCard) : null;
-  const card = liveCard && !liveCard.watched && !liveCard.disliked && inMode(liveCard) ? liveCard : null;
-
-  // Skip cards that became stale (watched/disliked outside this screen, or filtered by mode).
+  // Keep the buffer topped up.
   useEffect(() => {
-    if (rawCard && !card && !flow) {
-      setQueueIdx((n) => n + 1);
-    }
-  }, [rawCard, card, flow]);
+    if (!loading && i >= feed.length - BUFFER) ensureBuffer();
+  }, [i, feed.length, loading, ensureBuffer]);
 
-  // When the queue runs out, reshuffle any remaining Watch Later items for a continuous feed.
-  useEffect(() => {
-    if (queueIdx >= queue.length && !flow) {
-      const remaining = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t));
-      if (remaining.length > 0) {
-        queueRef.current = shuffle(remaining);
-        setQueueIdx(0);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queueIdx, flow, queue.length, state.titles, mode]);
+  const card = feed[i];
 
-  const watchLaterCount = state.titles.filter((t) => !t.watched && !t.disliked && inMode(t)).length;
-  const exhausted = queueIdx >= queue.length && watchLaterCount === 0;
-
+  // After enough actions, weave in a re-rank of two existing ranked titles.
   function maybeRerank() {
-    const lib = state.titles.filter((t) => t.watched && !t.disliked && inMode(t));
+    const lib = watched;
     if (lib.length < 4) return false;
     sinceRerank.current += 1;
     if (sinceRerank.current >= rerankInterval(lib.length)) {
       sinceRerank.current = 0;
-      const pick = lib[Math.floor(Math.random() * lib.length)];
-      setFlow({ title: pick, kind: 'rerank' });
+      const idx = Math.floor(Math.random() * (lib.length - 1));
+      setFlow({ kind: 'duel', a: lib[idx], b: lib[idx + 1] });
       return true;
     }
     return false;
   }
 
-  function triggerRerank() {
-    const lib = state.titles.filter((t) => t.watched && !t.disliked && inMode(t));
-    if (!lib.length) return;
-    const pick = lib[Math.floor(Math.random() * lib.length)];
-    setFlow({ title: pick, kind: 'rerank' });
-  }
-
-  function advance() {
-    setCount((c) => c + 1);
-    setQueueIdx((n) => n + 1);
-  }
-
-  function seenIt() {
-    if (!card || flow) return;
-    if (!state.titles.find((t) => t.id === card.id)) {
-      dispatch({ type: 'ADD_TITLE', title: { ...card, watched: false } });
+  function ensureInState(t) {
+    if (!state.titles.find((x) => x.id === t.id)) {
+      dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
     }
+  }
+
+  // "Yes" — seen it, place it in the ranked list.
+  function yes() {
+    if (!card || flow) return;
+    ensureInState(card);
     dispatch({ type: 'MARK_WATCHED', id: card.id });
-    setFlow({ title: card, kind: 'place' });
+    setFlow({ kind: 'place', title: card });
   }
 
-  function haventSeen() {
-    // Item stays on Watch Later; advance without any state change.
+  // "Not Interested" — never recommend.
+  function notInterested() {
     if (!card || flow) return;
-    if (!state.titles.find((t) => t.id === card.id)) {
-      dispatch({ type: 'ADD_TITLE', title: card });
-    }
-    advance();
+    ensureInState(card);
+    dispatch({ type: 'DISLIKE_TITLE', id: card.id });
+    setCount((c) => c + 1);
+    setI((n) => n + 1);
     maybeRerank();
   }
 
-  function pass() {
-    // Not interested — mark disliked and remove from Watch Later.
+  // "No" — haven't seen it, add to Watch Later.
+  function no() {
     if (!card || flow) return;
-    dispatch({ type: 'DISLIKE_TITLE', id: card.id });
-    advance();
+    ensureInState(card);
+    dispatch({ type: 'ADD_WATCH_LATER', id: card.id });
+    setCount((c) => c + 1);
+    setI((n) => n + 1);
     maybeRerank();
   }
 
@@ -143,7 +159,8 @@ export default function RankMode({ onExit }) {
     const f = flow;
     setFlow(null);
     if (f?.kind === 'place') {
-      advance();
+      setCount((c) => c + 1);
+      setI((n) => n + 1);
       maybeRerank();
     }
   }
@@ -151,9 +168,9 @@ export default function RankMode({ onExit }) {
   useEffect(() => {
     function onKey(e) {
       if (flow) return;
-      if (e.key === 'ArrowRight') seenIt();
-      else if (e.key === 'ArrowLeft') pass();
-      else if (e.key === 'ArrowUp') haventSeen();
+      if (e.key === 'ArrowRight') yes();
+      else if (e.key === 'ArrowLeft') notInterested();
+      else if (e.key === 'ArrowUp') no();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -163,50 +180,36 @@ export default function RankMode({ onExit }) {
   function onDragEnd(_, info) {
     if (flow) return;
     const { x, y } = info.offset;
-    if (y < -120) haventSeen();
-    else if (x > 120) seenIt();
-    else if (x < -120) pass();
+    if (y < -100) no();
+    else if (x > 100) yes();
+    else if (x < -100) notInterested();
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-5">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto flex h-screen max-w-md flex-col px-5 py-4">
+      <div className="flex shrink-0 items-center justify-between">
         <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
           ←
         </button>
         <span className="text-sm text-sub">
-          {count > 0 ? `${count} ranked this session` : 'Your Watch List'}
+          {count > 0 ? `${count} this session` : 'Have you seen this?'}
         </span>
       </div>
 
       <ModeToggle
         value={mode}
         onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })}
-        className="mx-auto mt-3"
+        className="mx-auto mt-3 shrink-0"
       />
 
-      <div className="flex flex-1 flex-col items-center justify-center">
-        {!card && !exhausted && (
-          <div className="h-[60vh] w-full animate-pulse rounded-xl bg-surface" />
-        )}
-        {exhausted && (
-          <div className="text-center">
-            <p className="font-display text-2xl text-txt">Watch Later is empty.</p>
-            <p className="mt-1 text-sub">
-              {count > 0 ? `${count} ranked this session. ` : ''}
-              Add more titles, or keep calibrating your rankings.
-            </p>
-            {state.titles.filter((t) => t.watched && !t.disliked && inMode(t)).length >= 4 && (
-              <button
-                onClick={triggerRerank}
-                className="mt-5 rounded-xl bg-accent px-6 py-3 font-semibold text-white active:scale-95"
-              >
-                Re-rank Existing Titles
-              </button>
-            )}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
+        {loading && <div className="h-full max-h-[46vh] w-full animate-pulse rounded-xl bg-surface" />}
+        {!loading && !card && (
+          <div className="text-center text-sub">
+            <p className="font-display text-2xl text-txt">All caught up.</p>
+            <p className="mt-1">{count} sorted this session.</p>
           </div>
         )}
-
         <AnimatePresence mode="wait">
           {card && (
             <motion.div
@@ -215,25 +218,25 @@ export default function RankMode({ onExit }) {
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.6}
               onDragEnd={onDragEnd}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full cursor-grab overflow-hidden rounded-xl border border-border bg-surface shadow-card active:cursor-grabbing"
+              className="flex w-full cursor-grab flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-card active:cursor-grabbing"
             >
               <img
                 src={card.poster || FALLBACK}
                 alt={card.title}
                 onError={(e) => (e.currentTarget.src = FALLBACK)}
-                className="max-h-[55vh] w-full object-cover"
+                className="max-h-[42vh] w-full object-cover"
               />
-              <div className="p-4">
-                <div className="font-display text-2xl text-txt">{card.title}</div>
-                <div className="mt-1 text-sm text-sub">
+              <div className="p-3">
+                <div className="font-display text-xl leading-tight text-txt">{card.title}</div>
+                <div className="mt-0.5 text-sm text-sub">
                   {card.year || '—'} · ★ {(card.rating || 0).toFixed(1)}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   <TypeBadge type={card.type} />
-                  {(card.genres || []).slice(0, 3).map((g) => (
+                  {(card.genres || []).slice(0, 2).map((g) => (
                     <GenreBadge key={g}>{g}</GenreBadge>
                   ))}
                 </div>
@@ -244,29 +247,30 @@ export default function RankMode({ onExit }) {
       </div>
 
       {card && (
-        <div className="flex flex-col gap-3 pb-2">
-          <button
-            onClick={haventSeen}
-            className="w-full rounded-xl border border-accent bg-surface py-4 font-semibold text-accent active:scale-95"
-          >
-            Haven't Seen It — Keep on Watch Later
-          </button>
-          <div className="flex gap-3">
+        <div className="shrink-0 space-y-2 pb-1">
+          <p className="text-center text-sm text-sub">Have you seen this?</p>
+          <div className="flex gap-2">
             <button
-              onClick={seenIt}
+              onClick={yes}
               className="flex-1 rounded-xl bg-win py-3 font-semibold text-white active:scale-95"
             >
-              Just Watched It
+              Yes
             </button>
             <button
-              onClick={pass}
+              onClick={no}
+              className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent active:scale-95"
+            >
+              No
+            </button>
+            <button
+              onClick={notInterested}
               className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub active:scale-95"
             >
-              Pass
+              Not for me
             </button>
           </div>
-          <p className="text-center text-xs text-neutral">
-            Ranking your list · not a recommendations feed
+          <p className="text-center text-[11px] text-neutral">
+            Yes = rank it · No = Watch Later · Not for me = hide
           </p>
         </div>
       )}
@@ -274,10 +278,11 @@ export default function RankMode({ onExit }) {
       <AnimatePresence>
         {flow && (
           <Overlay key="rank-flow">
-            {flow.kind === 'rerank' && (
-              <p className="mb-4 text-sm uppercase tracking-wider text-gold">Quick re-rank</p>
+            {flow.kind === 'place' ? (
+              <PostWatchRanking title={flow.title} onDone={finishFlow} />
+            ) : (
+              <RerankDuel a={flow.a} b={flow.b} onDone={finishFlow} />
             )}
-            <PostWatchRanking title={flow.title} onDone={finishFlow} />
           </Overlay>
         )}
       </AnimatePresence>

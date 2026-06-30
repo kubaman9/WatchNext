@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 const ITEMS = [
   { id: 'home', label: 'Home', icon: '🏠' },
   { id: 'list', label: 'My List', icon: '📋' },
+  { id: 'watchlater', label: 'Watch Later', icon: '🔖' },
   { id: 'rank', label: 'Rank Titles', icon: '⚡' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];

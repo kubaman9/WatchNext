@@ -8,6 +8,7 @@ import Onboarding from './components/onboarding/Onboarding';
 import HomeScreen from './components/home/HomeScreen';
 import RankMode from './components/ranking/RankMode';
 import MyList from './components/list/MyList';
+import WatchLater from './components/list/WatchLater';
 import Settings from './components/list/Settings';
 import NavDrawer from './components/shared/NavDrawer';
 import Toast from './components/shared/Toast';
@@ -69,6 +70,7 @@ export default function App() {
         />
       )}
       {view === 'list' && <MyList onExit={() => setView('home')} />}
+      {view === 'watchlater' && <WatchLater onExit={() => setView('home')} />}
       {view === 'rank' && <RankMode onExit={() => setView('home')} />}
       {view === 'settings' && (
         <Settings onExit={() => setView('home')} onResetTaste={resetTaste} />

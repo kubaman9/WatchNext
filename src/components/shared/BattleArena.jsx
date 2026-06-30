@@ -28,15 +28,15 @@ function Card({ title, side, highlighted, winner, loser, onPick }) {
           src={title.poster || FALLBACK}
           alt={title.title}
           onError={(e) => (e.currentTarget.src = FALLBACK)}
-          className="h-full w-full object-cover"
+          className="h-full max-h-[44vh] w-full object-cover"
         />
       </div>
-      <div className="p-3">
-        <div className="font-display text-lg leading-tight text-txt">{title.title}</div>
-        <div className="mt-0.5 text-sm text-sub">{title.year || '—'}</div>
-        <div className="mt-2 flex flex-wrap gap-1">
+      <div className="p-2.5">
+        <div className="font-display text-base leading-tight text-txt">{title.title}</div>
+        <div className="mt-0.5 text-xs text-sub">{title.year || '—'}</div>
+        <div className="mt-1.5 flex flex-wrap gap-1">
           <TypeBadge type={title.type} />
-          {(title.genres || []).slice(0, 2).map((g) => (
+          {(title.genres || []).slice(0, 1).map((g) => (
             <GenreBadge key={g}>{g}</GenreBadge>
           ))}
         </div>
@@ -89,7 +89,7 @@ export default function BattleArena({
   if (!left || !right) return null;
 
   return (
-    <div className="flex w-full max-w-3xl flex-col items-center gap-5">
+    <div className="flex w-full max-w-3xl flex-col items-center gap-4">
       {progress != null && (
         <div className="h-1 w-full overflow-hidden rounded-full bg-border">
           <div
@@ -99,7 +99,7 @@ export default function BattleArena({
         </div>
       )}
       {prompt && (
-        <h2 className="text-center font-display text-2xl text-txt sm:text-3xl">{prompt}</h2>
+        <h2 className="text-center font-display text-xl text-txt sm:text-3xl">{prompt}</h2>
       )}
       <AnimatePresence mode="wait">
         <motion.div
@@ -108,7 +108,7 @@ export default function BattleArena({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -40 }}
           transition={{ duration: 0.25 }}
-          className="flex w-full flex-col gap-4 sm:flex-row sm:items-stretch"
+          className="flex w-full flex-row items-stretch gap-3"
         >
           <Card
             title={left}

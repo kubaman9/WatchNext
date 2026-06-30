@@ -36,8 +36,8 @@ export default function MyList({ onExit }) {
   }, [watched, sort, mode, q]);
 
   return (
-    <div className="mx-auto min-h-screen max-w-2xl px-5 py-5">
-      <div className="flex items-center gap-3">
+    <div className="mx-auto flex h-screen max-w-2xl flex-col px-5 py-5">
+      <div className="flex shrink-0 items-center gap-3">
         <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
           ←
         </button>
@@ -48,10 +48,10 @@ export default function MyList({ onExit }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search your list…"
-        className="mt-4 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-txt outline-none focus:border-accent"
+        className="mt-4 w-full shrink-0 rounded-lg border border-border bg-surface px-4 py-2.5 text-txt outline-none focus:border-accent"
       />
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2">
         {Object.entries(SORTS).map(([k, label]) => (
           <button
             key={k}
@@ -72,7 +72,7 @@ export default function MyList({ onExit }) {
 
       {!rows.length && <p className="mt-10 text-center text-sub">Nothing ranked yet.</p>}
 
-      <ul className="mt-4 space-y-2">
+      <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
         {rows.map((t) => (
           <li key={t.id}>
             <button
