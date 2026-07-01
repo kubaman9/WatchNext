@@ -15,7 +15,10 @@ export function genreMultiplier(title, genreWeights) {
 export function score(title, taste) {
   const genreMult = genreMultiplier(title, taste.genreWeights || {});
   const skipPenalty = Math.max(0.5, 1 - (title.skippedFromButton || 0) * 0.1);
-  return title.eloScore * genreMult * skipPenalty;
+  // Unwatched titles all share Elo 1000, so lean on TMDB acclaim to separate a
+  // great pick from a mediocre one within the same favored genre (0.7–1.0).
+  const quality = 0.7 + 0.3 * Math.max(0, Math.min(1, (title.rating || 0) / 10));
+  return title.eloScore * genreMult * skipPenalty * quality;
 }
 
 // Adjust genre weights after a battle. Mutates a copy, returns new weights map.
