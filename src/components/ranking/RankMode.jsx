@@ -38,6 +38,7 @@ export default function RankMode({ onExit }) {
   const [count, setCount] = useState(0);
   const [flow, setFlow] = useState(null); // { kind:'place', title } | { kind:'duel', a, b }
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const modeRef = useRef(mode);
   const knownIds = useRef(new Set());
@@ -51,6 +52,7 @@ export default function RankMode({ onExit }) {
   const ensureBuffer = useCallback(async () => {
     if (loadingMore.current || exhausted.current) return;
     loadingMore.current = true;
+    setError(false);
     try {
       let added = 0;
       let empties = 0;
@@ -74,10 +76,21 @@ export default function RankMode({ onExit }) {
         setFeed((f) => [...f, ...fresh]);
         added += fresh.length;
       }
+    } catch {
+      // TMDB unreachable / rate-limited — allow a retry.
+      page.current -= 1;
+      setError(true);
     } finally {
       loadingMore.current = false;
     }
   }, []);
+
+  function retry() {
+    exhausted.current = false;
+    setError(false);
+    setLoading(true);
+    ensureBuffer().then(() => setLoading(false));
+  }
 
   // Initial load — seed known ids from anything already classified.
   useEffect(() => {
@@ -237,7 +250,19 @@ export default function RankMode({ onExit }) {
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
         {loading && <div className="h-full max-h-[46vh] w-full animate-pulse rounded-xl bg-surface" />}
-        {!loading && !card && (
+        {!loading && error && !card && (
+          <div className="text-center text-sub">
+            <p className="font-display text-xl text-txt">Couldn’t load titles.</p>
+            <p className="mt-1 text-sm">Check your connection or TMDB key.</p>
+            <button
+              onClick={retry}
+              className="mt-4 rounded-xl bg-accent px-6 py-2.5 font-semibold text-white active:scale-95"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {!loading && !error && !card && (
           <div className="text-center text-sub">
             <p className="font-display text-2xl text-txt">All caught up.</p>
             <p className="mt-1">{count} sorted this session.</p>
