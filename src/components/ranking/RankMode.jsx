@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import { feedPage } from '../../services/tmdbApi';
-import GenreBadge from '../shared/GenreBadge';
-import TypeBadge from '../shared/TypeBadge';
 import ModeToggle from '../shared/ModeToggle';
 import Overlay from '../shared/Overlay';
 import PostWatchRanking from './PostWatchRanking';
 import RerankDuel from './RerankDuel';
-
-const FALLBACK =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" fill="#13131A"/></svg>`
-  );
+import SwipeCard from './SwipeCard';
 
 const BUFFER = 5;
 // Weave re-ranks in frequently — every 3-5 classifications, more often as the
@@ -35,7 +28,6 @@ export default function RankMode({ onExit }) {
 
   const [feed, setFeed] = useState([]);
   const [i, setI] = useState(0);
-  const [count, setCount] = useState(0);
   const [flow, setFlow] = useState(null); // { kind:'place', title } | { kind:'duel', a, b }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -186,7 +178,6 @@ export default function RankMode({ onExit }) {
     if (!card || flow) return;
     ensureInState(card);
     dispatch({ type: 'DISLIKE_TITLE', id: card.id });
-    setCount((c) => c + 1);
     setI((n) => n + 1);
     maybeRerank();
   }
@@ -196,7 +187,6 @@ export default function RankMode({ onExit }) {
     if (!card || flow) return;
     ensureInState(card);
     dispatch({ type: 'ADD_WATCH_LATER', id: card.id });
-    setCount((c) => c + 1);
     setI((n) => n + 1);
     maybeRerank();
   }
@@ -205,7 +195,6 @@ export default function RankMode({ onExit }) {
     const f = flow;
     setFlow(null);
     if (f?.kind === 'place') {
-      setCount((c) => c + 1);
       setI((n) => n + 1);
       maybeRerank();
     }
@@ -223,23 +212,14 @@ export default function RankMode({ onExit }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, flow]);
 
-  function onDragEnd(_, info) {
-    if (flow) return;
-    const { x, y } = info.offset;
-    if (y < -100) no();
-    else if (x > 100) yes();
-    else if (x < -100) notInterested();
-  }
-
   return (
     <div className="mx-auto flex h-screen max-w-md flex-col px-5 py-4">
       <div className="flex shrink-0 items-center justify-between">
         <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
           ←
         </button>
-        <span className="text-sm text-sub">
-          {count > 0 ? `${count} this session` : 'Have you seen this?'}
-        </span>
+        <span className="font-display text-lg text-txt">Discover</span>
+        <span className="w-6" />
       </div>
 
       <ModeToggle
@@ -249,7 +229,7 @@ export default function RankMode({ onExit }) {
       />
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
-        {loading && <div className="h-full max-h-[46vh] w-full animate-pulse rounded-xl bg-surface" />}
+        {loading && <div className="h-full max-h-[46vh] w-full animate-pulse rounded-2xl bg-surface" />}
         {!loading && error && !card && (
           <div className="text-center text-sub">
             <p className="font-display text-xl text-txt">Couldn’t load titles.</p>
@@ -264,44 +244,13 @@ export default function RankMode({ onExit }) {
         )}
         {!loading && !error && !card && (
           <div className="text-center text-sub">
-            <p className="font-display text-2xl text-txt">All caught up.</p>
-            <p className="mt-1">{count} sorted this session.</p>
+            <p className="font-display text-2xl text-txt">That’s everything for now.</p>
+            <p className="mt-1">Check back soon for more titles.</p>
           </div>
         )}
-        <AnimatePresence mode="wait">
-          {card && (
-            <motion.div
-              key={card.id}
-              drag
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0.6}
-              onDragEnd={onDragEnd}
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="flex w-full cursor-grab flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-card active:cursor-grabbing"
-            >
-              <img
-                src={card.poster || FALLBACK}
-                alt={card.title}
-                onError={(e) => (e.currentTarget.src = FALLBACK)}
-                className="max-h-[42vh] w-full object-cover"
-              />
-              <div className="p-3">
-                <div className="font-display text-xl leading-tight text-txt">{card.title}</div>
-                <div className="mt-0.5 text-sm text-sub">
-                  {card.year || '—'} · ★ {(card.rating || 0).toFixed(1)}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <TypeBadge type={card.type} />
-                  {(card.genres || []).slice(0, 2).map((g) => (
-                    <GenreBadge key={g}>{g}</GenreBadge>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {card && (
+          <SwipeCard key={card.id} card={card} onYes={yes} onLater={no} onNo={notInterested} />
+        )}
       </div>
 
       {card && (
@@ -309,20 +258,20 @@ export default function RankMode({ onExit }) {
           <p className="text-center text-sm text-sub">Have you seen this?</p>
           <button
             onClick={yes}
-            className="w-full rounded-xl bg-win py-3 font-semibold text-white active:scale-95"
+            className="w-full rounded-xl bg-win py-3 font-semibold text-white transition-transform active:scale-95"
           >
             Yes — rank it
           </button>
           <div className="flex gap-2">
             <button
               onClick={no}
-              className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent active:scale-95"
+              className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent transition-transform active:scale-95"
             >
               Add to Watch Later
             </button>
             <button
               onClick={notInterested}
-              className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub active:scale-95"
+              className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub transition-transform active:scale-95"
             >
               Not Interested
             </button>
