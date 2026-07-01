@@ -1,0 +1,13 @@
+{
+  "name": "WatchNext",
+  "short_name": "WatchNext",
+  "description": "What should I watch next? A ruthless, ranked answer engine for movies & TV.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0506",
+  "theme_color": "#0A0506",
+  "icons": [
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" }
+  ]
+}
