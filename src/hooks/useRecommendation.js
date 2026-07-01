@@ -66,5 +66,16 @@ export function useRecommendation() {
     return ranked[0]?.poster || null;
   }
 
-  return { pick, suggest, candidates, topPoster };
+  // Milliseconds until a fresh suggestion unlocks (0 if ready now).
+  function suggestionRemaining() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(SUGGESTION_KEY) || 'null');
+      if (!cached) return 0;
+      return Math.max(0, cached.ts + WINDOW_MS - Date.now());
+    } catch {
+      return 0;
+    }
+  }
+
+  return { pick, suggest, candidates, topPoster, suggestionRemaining };
 }

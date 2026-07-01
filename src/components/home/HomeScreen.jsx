@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useRecommendation } from '../../hooks/useRecommendation';
@@ -19,7 +19,7 @@ function greeting() {
 
 export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
   const { state, dispatch } = useApp();
-  const { suggest, topPoster } = useRecommendation();
+  const { suggest, topPoster, suggestionRemaining } = useRecommendation();
   const { watched, rankOf } = useTitles();
   const mode = state.settings.mode || 'both';
 
@@ -27,6 +27,21 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
   const [ranking, setRanking] = useState(null);
   const [quickAdd, setQuickAdd] = useState(false);
   const [bg] = useState(() => topPoster());
+  const [, tick] = useState(0);
+
+  // Re-render each second so the "next pick" countdown stays live.
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remaining = suggestionRemaining();
+  const countdown =
+    remaining > 0
+      ? `Next fresh pick in ${Math.floor(remaining / 60000)}:${String(
+          Math.floor((remaining % 60000) / 1000)
+        ).padStart(2, '0')}`
+      : null;
 
   function inMode(t) {
     return mode === 'both' || t.type === mode;
@@ -108,9 +123,10 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
           >
             🎬 What Should I Watch?
           </button>
+          <p className="mt-3 h-4 text-xs text-neutral">{countdown || 'A fresh pick is ready'}</p>
           <button
             onClick={() => onNavigate('rank')}
-            className="mt-4 text-sm text-sub underline-offset-4 hover:text-txt hover:underline"
+            className="mt-3 text-sm text-sub underline-offset-4 hover:text-txt hover:underline"
           >
             ⚡ Rank titles & build your list
           </button>
