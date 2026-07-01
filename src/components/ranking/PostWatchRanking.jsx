@@ -2,78 +2,92 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
-import { seedElo, estimateIndex, eloForIndex, randomPrompt } from '../../utils/rating';
+import { seedElo, estimateIndex, randomPrompt } from '../../utils/rating';
 import BattleArena from '../shared/BattleArena';
 
 // ── The one rating engine ─────────────────────────────────────────────────────
 // Every place a title gets ranked (Rank Mode "Yes", Home "Watch This"/quick-add,
-// Watch Later "Seen", My List re-rank) renders this component. It places a title
-// by binary insertion into the live ranked list:
-//   • multi-factor seed (baseline + genre affinity + TMDB popularity) chooses the
-//     first comparison, so we start near the likely spot
-//   • each comparison halves the candidate window → exact placement in ~log2(N)
-//   • randomized pivots + rotating prompts make every session feel fresh
-//   • one "🔥 Mega prefer" per session jumps the title to the top of the window
-//   • thorough mode (My List re-rank) adds boundary verification rounds
-// Placement is comparison-driven, so a title always lands above everything it beat
-// and below everything it lost to — no slow Elo convergence.
+// Watch Later "Seen", My List re-rank) renders this component.
+//
+// It picks opponents by binary insertion (start near a multi-factor seed, then
+// halve the candidate window each pick) and places the title strictly between the
+// highest-Elo title it beat and the lowest-Elo title it lost to — so it always
+// lands above what it beat and below what it lost to.
+//
+// Quick placements stop as soon as the window converges (~log2 N comparisons).
+// A `thorough` re-rank (from My List) instead runs a guaranteed minimum number of
+// comparisons (up to 5), continuing against the nearest untested neighbors after
+// the window converges, so a re-rank is deliberately careful.
 export default function PostWatchRanking({ title, onDone, thorough = false }) {
   const { state, dispatch } = useApp();
   const { watched, rankOf, neighbors, ratingOf } = useTitles();
 
   // Freeze the ranked snapshot (desc by Elo) for the whole session.
   const rankedRef = useRef(null);
-  if (rankedRef.current === null) {
-    rankedRef.current = watched.filter((t) => t.id !== title.id);
-  }
+  if (rankedRef.current === null) rankedRef.current = watched.filter((t) => t.id !== title.id);
   const ranked = rankedRef.current;
 
   const baseline = state.taste.baseline || 1000;
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = seedElo(title, { taste: state.taste, baseline });
 
+  // Guaranteed minimum comparisons: thorough → up to 5 (or list size); quick → 0.
+  const minComparisons = thorough ? Math.min(5, ranked.length) : 0;
+  const estTotal = Math.max(minComparisons, Math.ceil(Math.log2(ranked.length + 1)), 1);
+
   const lo = useRef(0);
   const hi = useRef(ranked.length);
-  const verifyQueue = useRef(null); // indices to re-check in thorough mode
+  const used = useRef([]); // ranked ids already compared
+  const beat = useRef([]); // Elos of titles this one beat
+  const lost = useRef([]); // Elos of titles this one lost to
+  const count = useRef(0);
   const [round, setRound] = useState(0);
   const [done, setDone] = useState(false);
   const [megaUsed, setMegaUsed] = useState(false);
-  const estTotal = Math.max(1, Math.ceil(Math.log2(ranked.length + 1))) + (thorough ? 2 : 0);
 
-  // Choose the opponent index for the current round.
+  // Nearest not-yet-tested index to a center, scanning outward — used to keep
+  // comparing after the binary window converges (thorough mode).
+  function nearestUnused(center) {
+    const c = Math.min(ranked.length - 1, Math.max(0, center));
+    for (let d = 0; d < ranked.length; d++) {
+      for (const i of [c - d, c + d]) {
+        if (i >= 0 && i < ranked.length && !used.current.includes(ranked[i].id)) return i;
+      }
+    }
+    return -1;
+  }
+
+  // Which opponent to show this round (-1 = we're done).
   const pivot = useMemo(() => {
-    if (verifyQueue.current && verifyQueue.current.length) return verifyQueue.current[0];
     const L = lo.current;
     const H = hi.current;
-    if (H - L <= 0) return -1;
-    if (round === 0) {
-      const si = estimateIndex(seedRef.current, ranked);
-      return Math.min(H - 1, Math.max(L, si >= H ? H - 1 : si));
+    if (H - L > 0) {
+      let idx;
+      if (round === 0) {
+        const si = estimateIndex(seedRef.current, ranked);
+        idx = Math.min(H - 1, Math.max(L, si >= H ? H - 1 : si));
+      } else {
+        const jitter = thorough ? 0.1 : 0.32;
+        const frac = 0.5 + (Math.random() - 0.5) * jitter;
+        idx = Math.min(H - 1, Math.max(L, Math.floor(L + (H - L) * frac)));
+      }
+      if (used.current.includes(ranked[idx]?.id)) {
+        // find an untested index inside the window
+        for (let i = L; i < H; i++) if (!used.current.includes(ranked[i].id)) return i;
+      }
+      return idx;
     }
-    const jitter = thorough ? 0.08 : 0.32; // wider variety in normal sessions
-    const frac = 0.5 + (Math.random() - 0.5) * jitter;
-    return Math.min(H - 1, Math.max(L, Math.floor(L + (H - L) * frac)));
+    // Window converged — keep going only if a thorough pass still owes comparisons.
+    if (count.current < minComparisons) return nearestUnused(lo.current);
+    return -1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
 
   const prompt = useMemo(() => randomPrompt(), [round]);
   const opponent = pivot >= 0 ? ranked[pivot] : null;
 
-  // Window collapsed (or no opponents) → enter verify phase or finalize.
   useEffect(() => {
-    if (done) return;
-    if (!opponent) {
-      if (thorough && verifyQueue.current === null && ranked.length) {
-        const idxs = [lo.current - 1, lo.current]
-          .filter((i) => i >= 0 && i < ranked.length);
-        if (idxs.length) {
-          verifyQueue.current = idxs;
-          setRound((r) => r + 1);
-          return;
-        }
-      }
-      finalizeAt(lo.current);
-    }
+    if (!opponent && !done) finalize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opponent]);
 
@@ -86,65 +100,63 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
     });
   }
 
-  function advance() {
-    setRound((r) => r + 1);
+  function record(opp, newWins) {
+    used.current.push(opp.id);
+    count.current += 1;
+    (newWins ? beat : lost).current.push(opp.eloScore ?? 1000);
+    // Narrow the binary window while it's still open.
+    if (hi.current - lo.current > 0) {
+      if (newWins) hi.current = pivot;
+      else lo.current = pivot + 1;
+    }
   }
 
   function handlePick(winner) {
     const opp = opponent;
     const newWins = winner.id === title.id;
     learn(newWins, opp);
-
-    // Verify phase: nudge the final boundary if the user flips on a neighbor.
-    if (verifyQueue.current && verifyQueue.current.length) {
-      const idx = verifyQueue.current[0];
-      if (newWins && idx < lo.current) lo.current = idx;
-      if (!newWins && idx >= lo.current) lo.current = idx + 1;
-      verifyQueue.current = verifyQueue.current.slice(1);
-      if (!verifyQueue.current.length) {
-        finalizeAt(lo.current);
-        return;
-      }
-      advance();
-      return;
-    }
-
-    if (newWins) hi.current = pivot;
-    else lo.current = pivot + 1;
-    advance();
+    record(opp, newWins);
+    setRound((r) => r + 1);
   }
 
   function handleNeither() {
-    // Treat as "about equal" — settle right at the pivot.
-    if (verifyQueue.current && verifyQueue.current.length) {
-      verifyQueue.current = verifyQueue.current.slice(1);
-      if (!verifyQueue.current.length) return finalizeAt(lo.current);
-      return advance();
+    // "About the same" — record no preference, just move on.
+    if (opponent) {
+      used.current.push(opponent.id);
+      count.current += 1;
+      if (hi.current - lo.current > 0) hi.current = Math.max(lo.current, pivot);
     }
-    finalizeAt(pivot >= 0 ? pivot : lo.current);
+    setRound((r) => r + 1);
   }
 
-  // One-shot "I love this": a decisive but modest lift ABOVE this opponent —
-  // a handful of points, not a jump to #1.
+  // Place strictly between the highest Elo it beat and the lowest it lost to.
+  function bracketElo() {
+    const lower = beat.current.length ? Math.max(...beat.current) : null;
+    const upper = lost.current.length ? Math.min(...lost.current) : null;
+    if (lower != null && upper != null) return Math.round((lower + upper) / 2);
+    if (lower != null) return lower + 30;
+    if (upper != null) return upper - 30;
+    return seedRef.current;
+  }
+
+  // One-shot "I love this": a decisive but modest lift ABOVE this opponent.
   function handleMega() {
     if (megaUsed || !opponent) return;
     setMegaUsed(true);
     learn(true, opponent);
-    const MEGA = 45;
     const above = ranked[pivot - 1];
-    let elo = (opponent.eloScore ?? 1000) + MEGA;
-    if (above) elo = Math.min(elo, (above.eloScore ?? 1000) - 1); // never leapfrog
+    let elo = (opponent.eloScore ?? 1000) + 45;
+    if (above) elo = Math.min(elo, (above.eloScore ?? 1000) - 1);
     finalizeWithElo(elo);
   }
 
+  function finalize() {
+    finalizeWithElo(ranked.length ? bracketElo() : seedRef.current);
+  }
   function finalizeWithElo(elo) {
     dispatch({ type: 'SET_ELO', id: title.id, elo });
     setDone(true);
     setTimeout(onDone, 1800);
-  }
-
-  function finalizeAt(index) {
-    finalizeWithElo(ranked.length ? eloForIndex(index, ranked) : seedRef.current);
   }
 
   if (done) {
@@ -175,14 +187,11 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
 
   if (!opponent) return <p className="text-sub">Placing…</p>;
 
-  const verifying = verifyQueue.current && verifyQueue.current.length;
-  const progress = verifying ? 0.95 : Math.min(0.9, round / estTotal);
-
   return (
     <>
-      {verifying && (
+      {thorough && (
         <p className="mb-3 text-center text-xs uppercase tracking-wider text-sub">
-          Double-checking placement…
+          Careful re-rank · comparison {count.current + 1}
         </p>
       )}
       <BattleArena
@@ -190,7 +199,7 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
         right={opponent}
         prompt={prompt}
         neitherLabel="About the same"
-        progress={progress}
+        progress={Math.min(0.95, count.current / estTotal)}
         onPick={handlePick}
         onNeither={handleNeither}
         onMega={!megaUsed ? handleMega : undefined}

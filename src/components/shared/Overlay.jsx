@@ -7,6 +7,9 @@ export default function Overlay({ children, onClose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      // Stop clicks from bubbling to a parent sheet's backdrop-close (e.g. when a
+      // re-rank runs inside Title Detail) — otherwise the first pick closes it.
+      onClick={(e) => e.stopPropagation()}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg/95 p-4 backdrop-blur"
     >
       {onClose && (
