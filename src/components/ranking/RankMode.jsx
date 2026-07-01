@@ -55,8 +55,11 @@ export default function RankMode({ onExit }) {
     setError(false);
     try {
       let added = 0;
-      let empties = 0;
-      while (added < 12 && empties < 2) {
+      const startPage = page.current;
+      // Keep paging past pages that are entirely already-classified — only a
+      // literally empty TMDB response (end of catalog) means we're done. Cap the
+      // pages scanned per call so we don't spin forever if truly exhausted.
+      while (added < 12 && page.current - startPage < 12) {
         page.current += 1;
         const titles = await feedPage(page.current, modeRef.current);
         if (!titles.length) {
@@ -68,10 +71,7 @@ export default function RankMode({ onExit }) {
             !knownIds.current.has(t.id) &&
             (modeRef.current === 'both' || t.type === modeRef.current)
         );
-        if (!fresh.length) {
-          empties += 1;
-          continue;
-        }
+        if (!fresh.length) continue; // whole page already seen — try the next
         fresh.forEach((t) => knownIds.current.add(t.id));
         setFeed((f) => [...f, ...fresh]);
         added += fresh.length;
