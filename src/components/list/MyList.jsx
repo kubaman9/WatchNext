@@ -30,6 +30,19 @@ export default function MyList({ onExit }) {
   const [sharpen, setSharpen] = useState(false);
   const provisionalCount = watched.filter((t) => isProvisional(t.id)).length;
 
+  const inScope = watched.filter((t) => mode === 'both' || t.type === mode);
+  const stats = useMemo(() => {
+    if (!inScope.length) return null;
+    const ratings = inScope.map((t) => ratingOf(t.id)).filter((r) => r != null);
+    const avg = ratings.reduce((s, r) => s + r, 0) / (ratings.length || 1);
+    return {
+      count: inScope.length,
+      avg: avg.toFixed(1),
+      movies: inScope.filter((t) => t.type === 'movie').length,
+      tv: inScope.filter((t) => t.type === 'tv').length,
+    };
+  }, [inScope, ratingOf]);
+
   const rows = useMemo(() => {
     let list = watched
       .filter((t) => mode === 'both' || t.type === mode)
@@ -47,6 +60,11 @@ export default function MyList({ onExit }) {
           ←
         </button>
         <h1 className="font-display text-2xl text-txt">My List</h1>
+        {stats && (
+          <span className="ml-auto text-right text-xs text-sub">
+            {stats.count} ranked · avg <span className="text-accent">{stats.avg}</span> · 🎬{stats.movies} 📺{stats.tv}
+          </span>
+        )}
       </div>
 
       <input
