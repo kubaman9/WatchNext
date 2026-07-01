@@ -82,6 +82,7 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
       type: 'LEARN_GENRES',
       up: newWins ? title.genreIds : opp.genreIds,
       down: newWins ? opp.genreIds : title.genreIds,
+      ids: [title.id, opp.id],
     });
   }
 

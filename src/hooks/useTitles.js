@@ -52,5 +52,24 @@ export function useTitles() {
     );
   }
 
-  return { titles, watched, rankOf, neighbors, seedElo, opponents, ratingOf };
+  // A title is "provisional" until it's been compared enough to trust its spot.
+  function confidenceOf(id) {
+    const t = watched.find((x) => x.id === id);
+    return t ? t.comparisons || 0 : 0;
+  }
+  function isProvisional(id) {
+    return confidenceOf(id) < 3;
+  }
+
+  return {
+    titles,
+    watched,
+    rankOf,
+    neighbors,
+    seedElo,
+    opponents,
+    ratingOf,
+    confidenceOf,
+    isProvisional,
+  };
 }

@@ -51,8 +51,10 @@ function reducer(state, action) {
       // the winner stayed below the loser for several more comparisons.
       if (we <= le) we = le + 1;
       const titles = state.titles.map((t) => {
-        if (t.id === winnerId) return { ...t, eloScore: we, wins: (t.wins || 0) + 1 };
-        if (t.id === loserId) return { ...t, eloScore: le, losses: (t.losses || 0) + 1 };
+        if (t.id === winnerId)
+          return { ...t, eloScore: we, wins: (t.wins || 0) + 1, comparisons: (t.comparisons || 0) + 1 };
+        if (t.id === loserId)
+          return { ...t, eloScore: le, losses: (t.losses || 0) + 1, comparisons: (t.comparisons || 0) + 1 };
         return t;
       });
       const genreWeights = bumpGenreWeights(
@@ -80,14 +82,22 @@ function reducer(state, action) {
 
     // Genre-only learning from a comparison (no Elo mutation) — used by the
     // binary-insertion placement engine, which sets Elo directly via SET_ELO.
+    // Also credits a comparison to each participant for confidence tracking.
     case 'LEARN_GENRES': {
       const genreWeights = bumpGenreWeights(
         state.taste.genreWeights,
         action.up || [],
         action.down || []
       );
+      const ids = action.ids || [];
+      const titles = ids.length
+        ? state.titles.map((t) =>
+            ids.includes(t.id) ? { ...t, comparisons: (t.comparisons || 0) + 1 } : t
+          )
+        : state.titles;
       return {
         ...state,
+        titles,
         taste: {
           ...state.taste,
           genreWeights,

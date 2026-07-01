@@ -128,7 +128,13 @@ export default function RankMode({ onExit }) {
       avail = pairs;
     }
     if (!avail.length) return null;
-    const pair = avail[Math.floor(Math.random() * avail.length)];
+    // Prefer matchups involving an under-compared (provisional) title so the
+    // least-certain rankings get sharpened first.
+    const provisional = avail.filter(
+      ([a, b]) => (a.comparisons || 0) < 3 || (b.comparisons || 0) < 3
+    );
+    const pool = provisional.length ? provisional : avail;
+    const pair = pool[Math.floor(Math.random() * pool.length)];
     shownPairs.current.add(pairKey(pair[0], pair[1]));
     return pair;
   }

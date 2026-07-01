@@ -19,7 +19,7 @@ const SORTS = {
 
 export default function MyList({ onExit }) {
   const { state, dispatch } = useApp();
-  const { watched, rankOf, ratingOf } = useTitles();
+  const { watched, rankOf, ratingOf, isProvisional } = useTitles();
   const [sort, setSort] = useState('rank');
   const mode = state.settings.mode || 'both';
   const [q, setQ] = useState('');
@@ -89,7 +89,17 @@ export default function MyList({ onExit }) {
                 className="h-16 w-11 shrink-0 rounded object-cover"
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-txt">{t.title}</span>
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-txt">{t.title}</span>
+                  {isProvisional(t.id) && (
+                    <span
+                      title="Needs more comparisons to be sure"
+                      className="shrink-0 rounded-full border border-gold/50 px-1.5 text-[10px] uppercase tracking-wide text-gold"
+                    >
+                      ◇ provisional
+                    </span>
+                  )}
+                </span>
                 <span className="mt-1 flex items-center gap-2 text-sm text-sub">
                   <TypeBadge type={t.type} />
                   <span className="truncate">
