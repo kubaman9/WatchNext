@@ -52,7 +52,7 @@ export default function Settings({ onExit, onResetTaste }) {
           <input
             type="range"
             min="1"
-            max="10"
+            max="5"
             step="1"
             value={baseline}
             onChange={(e) =>
@@ -60,7 +60,7 @@ export default function Settings({ onExit, onResetTaste }) {
             }
             className="flex-1 accent-accent"
           />
-          <span className="w-12 text-right font-display text-xl text-accent">{baseline}/10</span>
+          <span className="w-12 text-right font-display text-xl text-accent">{baseline}/5</span>
         </div>
       </section>
 

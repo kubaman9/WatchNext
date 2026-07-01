@@ -17,9 +17,15 @@ const FALLBACK =
   );
 
 const BUFFER = 5;
-// Weave a re-rank of existing titles in more often as the library grows.
+// Weave re-ranks in frequently — every 3-5 classifications, more often as the
+// library grows and there's more to keep calibrated.
 function rerankInterval(lib) {
-  return Math.min(9, Math.max(5, 13 - Math.floor(lib / 8)));
+  return Math.min(5, Math.max(3, 8 - Math.floor(lib / 6)));
+}
+
+// Stable key for a pair regardless of order.
+function pairKey(a, b) {
+  return [a.id, b.id].sort().join('|');
 }
 
 export default function RankMode({ onExit }) {
@@ -39,6 +45,7 @@ export default function RankMode({ onExit }) {
   const loadingMore = useRef(false);
   const exhausted = useRef(false);
   const sinceRerank = useRef(0);
+  const shownPairs = useRef(new Set()); // avoid repeating the same re-rank matchup
   const started = useRef(false);
 
   const ensureBuffer = useCallback(async () => {
@@ -107,16 +114,36 @@ export default function RankMode({ onExit }) {
 
   const card = feed[i];
 
-  // After enough actions, weave in a re-rank of two existing ranked titles.
+  // After enough actions, weave in a re-rank of two existing ranked titles —
+  // preferring adjacent pairs (best for refining order) that haven't been shown
+  // recently, so the user doesn't see the same matchup over and over.
+  function pickDuel(lib) {
+    const pairs = [];
+    for (let i = 0; i < lib.length - 1; i++) pairs.push([lib[i], lib[i + 1]]);
+    // a few close-but-not-adjacent pairs for variety
+    for (let i = 0; i + 2 < lib.length; i += 2) pairs.push([lib[i], lib[i + 2]]);
+    let avail = pairs.filter(([a, b]) => !shownPairs.current.has(pairKey(a, b)));
+    if (!avail.length) {
+      shownPairs.current.clear(); // cycle through again once exhausted
+      avail = pairs;
+    }
+    if (!avail.length) return null;
+    const pair = avail[Math.floor(Math.random() * avail.length)];
+    shownPairs.current.add(pairKey(pair[0], pair[1]));
+    return pair;
+  }
+
   function maybeRerank() {
     const lib = watched;
     if (lib.length < 4) return false;
     sinceRerank.current += 1;
     if (sinceRerank.current >= rerankInterval(lib.length)) {
       sinceRerank.current = 0;
-      const idx = Math.floor(Math.random() * (lib.length - 1));
-      setFlow({ kind: 'duel', a: lib[idx], b: lib[idx + 1] });
-      return true;
+      const pair = pickDuel(lib);
+      if (pair) {
+        setFlow({ kind: 'duel', a: pair[0], b: pair[1] });
+        return true;
+      }
     }
     return false;
   }

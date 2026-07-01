@@ -1,12 +1,30 @@
 import { genreMultiplier } from './scoring';
 
-// ── Baseline <-> rating mapping ───────────────────────────────────────────────
-// A 1–10 personal baseline maps onto the Elo scale. 10 → 1450, ~6 → 1010, 1 → 460.
+export const RATING_MAX = 5;
+
+// ── Baseline <-> rating mapping (out of 5) ────────────────────────────────────
+// A 1–5 personal baseline maps onto the Elo scale. 5 → 1400, 3 → 980, 1 → 560.
 export function ratingToElo(rating) {
-  return Math.round(350 + rating * 110);
+  return Math.round(350 + rating * 210);
 }
 export function eloToRating(elo) {
-  return Math.min(10, Math.max(1, Math.round((elo - 350) / 110)));
+  return Math.min(5, Math.max(1, Math.round((elo - 350) / 210)));
+}
+
+// The baseline dictates the floor of your personal rating scale: your lowest
+// title never sinks far below your center. Higher baseline = more generous rater.
+export function ratingFloor(baselineElo = 1000) {
+  const base = (baselineElo - 350) / 210; // ~1..5 (unclamped)
+  return Math.min(4, Math.max(0.5, base - 1.5));
+}
+
+// Map a title's Elo to a display rating in [floor, 5], given the watched-list
+// Elo range and the baseline-derived floor.
+export function eloToDisplayRating(elo, minElo, maxElo, baselineElo) {
+  const floor = ratingFloor(baselineElo);
+  if (maxElo === minElo) return Math.round(((floor + RATING_MAX) / 2) * 10) / 10;
+  const norm = ((elo ?? 1000) - minElo) / (maxElo - minElo);
+  return Math.round((floor + norm * (RATING_MAX - floor)) * 10) / 10;
 }
 
 // ── Multi-factor seed ─────────────────────────────────────────────────────────

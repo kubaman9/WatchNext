@@ -8,7 +8,7 @@ const FALLBACK =
   );
 
 export default function RatingAnchor({ title, onDone }) {
-  const [rating, setRating] = useState(7);
+  const [rating, setRating] = useState(4);
 
   return (
     <div className="mx-auto flex h-screen max-w-md flex-col items-center justify-center px-5 text-center">
@@ -26,12 +26,12 @@ export default function RatingAnchor({ title, onDone }) {
       <div className="mt-3 font-display text-xl text-txt">{title.title}</div>
 
       <div className="mt-6 font-display text-5xl text-accent">{rating}</div>
-      <span className="text-sm text-sub">out of 10</span>
+      <span className="text-sm text-sub">out of 5</span>
 
       <input
         type="range"
         min="1"
-        max="10"
+        max="5"
         step="1"
         value={rating}
         onChange={(e) => setRating(Number(e.target.value))}

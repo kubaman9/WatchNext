@@ -123,19 +123,27 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
     finalizeAt(pivot >= 0 ? pivot : lo.current);
   }
 
-  // One-shot "I love this": jump to the top of the still-feasible window.
+  // One-shot "I love this": a decisive but modest lift ABOVE this opponent —
+  // a handful of points, not a jump to #1.
   function handleMega() {
     if (megaUsed || !opponent) return;
     setMegaUsed(true);
     learn(true, opponent);
-    finalizeAt(lo.current);
+    const MEGA = 45;
+    const above = ranked[pivot - 1];
+    let elo = (opponent.eloScore ?? 1000) + MEGA;
+    if (above) elo = Math.min(elo, (above.eloScore ?? 1000) - 1); // never leapfrog
+    finalizeWithElo(elo);
   }
 
-  function finalizeAt(index) {
-    const elo = ranked.length ? eloForIndex(index, ranked) : seedRef.current;
+  function finalizeWithElo(elo) {
     dispatch({ type: 'SET_ELO', id: title.id, elo });
     setDone(true);
     setTimeout(onDone, 1800);
+  }
+
+  function finalizeAt(index) {
+    finalizeWithElo(ranked.length ? eloForIndex(index, ranked) : seedRef.current);
   }
 
   if (done) {
@@ -185,7 +193,7 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
         onPick={handlePick}
         onNeither={handleNeither}
         onMega={!megaUsed ? handleMega : undefined}
-        megaLabel={`🔥 Love ${title.title} — rank it high`}
+        megaLabel={`🔥 Love ${title.title} — bump it up`}
       />
     </>
   );
