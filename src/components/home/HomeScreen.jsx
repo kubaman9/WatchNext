@@ -68,6 +68,17 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
     setRanking(t);
   }
 
+  function handleDislike() {
+    const t = reveal;
+    if (!state.titles.find((x) => x.id === t.id)) {
+      dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
+    }
+    dispatch({ type: 'DISLIKE_TITLE', id: t.id });
+    localStorage.removeItem('watchnext_suggestion'); // a fresh pick unlocks now
+    setReveal(null);
+    onToast(`Won’t suggest ${t.title} again.`);
+  }
+
   function quickAddSelect(title) {
     dispatch({ type: 'ADD_TITLE', title: { ...title, watched: false } });
     dispatch({ type: 'MARK_WATCHED', id: title.id });
@@ -159,6 +170,7 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
             title={reveal}
             onWatch={handleWatch}
             onSkip={() => setReveal(null)}
+            onDislike={handleDislike}
             onClose={() => setReveal(null)}
           />
         )}

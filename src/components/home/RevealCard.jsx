@@ -11,7 +11,7 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
-export default function RevealCard({ title, skipStreak, onWatch, onSkip, onClose, onRankNudge }) {
+export default function RevealCard({ title, skipStreak, onWatch, onSkip, onDislike, onClose, onRankNudge }) {
   const providers = useProviders(title.id, title.type);
   const [expanded, setExpanded] = useState(false);
   useEscape(onClose);
@@ -103,6 +103,14 @@ export default function RevealCard({ title, skipStreak, onWatch, onSkip, onClose
             Not Now →
           </button>
         </div>
+        {onDislike && (
+          <button
+            onClick={onDislike}
+            className="mt-3 self-center text-sm text-neutral hover:text-sub"
+          >
+            Not interested — don’t suggest again
+          </button>
+        )}
       </div>
     </motion.div>
   );
