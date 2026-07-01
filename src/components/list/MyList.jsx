@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import TitleDetail from './TitleDetail';
 import TypeBadge from '../shared/TypeBadge';
 import ModeToggle from '../shared/ModeToggle';
+import Overlay from '../shared/Overlay';
+import SharpenFlow from '../ranking/SharpenFlow';
 
 const FALLBACK =
   'data:image/svg+xml;utf8,' +
@@ -24,6 +27,8 @@ export default function MyList({ onExit }) {
   const mode = state.settings.mode || 'both';
   const [q, setQ] = useState('');
   const [detail, setDetail] = useState(null);
+  const [sharpen, setSharpen] = useState(false);
+  const provisionalCount = watched.filter((t) => isProvisional(t.id)).length;
 
   const rows = useMemo(() => {
     let list = watched
@@ -69,6 +74,15 @@ export default function MyList({ onExit }) {
           className="ml-auto"
         />
       </div>
+
+      {provisionalCount > 0 && (
+        <button
+          onClick={() => setSharpen(true)}
+          className="mt-3 shrink-0 rounded-lg border border-gold/50 bg-surface py-2 text-sm font-medium text-gold active:scale-95"
+        >
+          ◇ Sharpen {provisionalCount} uncertain ranking{provisionalCount === 1 ? '' : 's'}
+        </button>
+      )}
 
       {!rows.length && <p className="mt-10 text-center text-sub">Nothing ranked yet.</p>}
 
@@ -119,6 +133,14 @@ export default function MyList({ onExit }) {
       </ul>
 
       {detail && <TitleDetail title={detail} onClose={() => setDetail(null)} />}
+
+      <AnimatePresence>
+        {sharpen && (
+          <Overlay key="sharpen" onClose={() => setSharpen(false)}>
+            <SharpenFlow onDone={() => setSharpen(false)} />
+          </Overlay>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
