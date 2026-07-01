@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useProviders } from '../../hooks/useTmdb';
+import { useEscape } from '../../hooks/useEscape';
 import GenreBadge from '../shared/GenreBadge';
 import TypeBadge from '../shared/TypeBadge';
 
@@ -13,6 +14,7 @@ const FALLBACK =
 export default function RevealCard({ title, skipStreak, onWatch, onSkip, onClose, onRankNudge }) {
   const providers = useProviders(title.id, title.type);
   const [expanded, setExpanded] = useState(false);
+  useEscape(onClose);
 
   const synopsis = title.overview || 'No synopsis available.';
   const long = synopsis.length > 140;

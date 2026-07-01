@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEscape } from '../../hooks/useEscape';
 
 const ITEMS = [
   { id: 'home', label: 'Home', icon: '🏠' },
@@ -9,6 +10,7 @@ const ITEMS = [
 ];
 
 export default function NavDrawer({ open, current, onNavigate, onClose, user, onLogout }) {
+  useEscape(open ? onClose : null);
   return (
     <AnimatePresence>
       {open && (

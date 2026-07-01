@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSearch } from '../../hooks/useTmdb';
+import { useEscape } from '../../hooks/useEscape';
 import PosterCard from './PosterCard';
 
 // Bottom-sheet search. onSelect(title) called per pick.
@@ -13,6 +14,7 @@ export default function SearchSheet({
   subtitle,
 }) {
   const { query, setQuery, results, loading } = useSearch();
+  useEscape(open ? onClose : null);
 
   return (
     <AnimatePresence>

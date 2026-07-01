@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
+import { useEscape } from '../../hooks/useEscape';
 import GenreBadge from '../shared/GenreBadge';
 import TypeBadge from '../shared/TypeBadge';
 import Overlay from '../shared/Overlay';
@@ -18,6 +19,7 @@ export default function TitleDetail({ title, onClose }) {
   const { rankOf, ratingOf } = useTitles();
   const [reranking, setReranking] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  useEscape(reranking ? null : onClose);
 
   function remove() {
     dispatch({ type: 'REMOVE_TITLE', id: title.id });
