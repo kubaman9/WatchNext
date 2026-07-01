@@ -140,8 +140,10 @@ function reducer(state, action) {
     }
 
     case 'REMOVE_WATCH_LATER': {
+      // Removing marks it dismissed so it doesn't immediately resurface in
+      // Discover (or the suggestion pool) — the user already said "not this".
       const titles = state.titles.map((t) =>
-        t.id === action.id ? { ...t, watchLater: false } : t
+        t.id === action.id ? { ...t, watchLater: false, dismissed: true } : t
       );
       return { ...state, titles, watchLater: state.watchLater.filter((id) => id !== action.id) };
     }
@@ -173,6 +175,7 @@ function reducer(state, action) {
         losses: 0,
         skippedFromButton: 0,
         disliked: false,
+        dismissed: false,
       }));
       return {
         ...state,

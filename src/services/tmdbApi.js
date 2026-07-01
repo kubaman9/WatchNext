@@ -123,6 +123,24 @@ export async function popular(type = 'movie', page = 1) {
     .map((r) => normalize({ ...r, media_type: type }));
 }
 
+// A ranked list from a given TMDB endpoint (popular / top_rated / trending).
+async function fromSource(type, source, page) {
+  const path = source === 'trending' ? `/trending/${type}/week` : `/${type}/${source}`;
+  const json = await get(path, { page });
+  return (json.results || [])
+    .filter((r) => r.poster_path)
+    .map((r) => normalize({ ...r, media_type: type }));
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export async function buildPool(size = 50) {
   if (isDemoMode()) return mock.buildPool(size);
   const [tr, mp, tp] = await Promise.all([trending(), popular('movie'), popular('tv')]);
@@ -137,16 +155,24 @@ export async function buildPool(size = 50) {
   return out;
 }
 
-// Paginated feed for Rank Mode's infinite scroll. Interleaves movie + tv popular
-// pages by `mode`. Returns [] when there are no more results (end of catalog).
+// Rotate the source each page so Discover isn't just the same popularity list —
+// popular, then top-rated, then trending, and repeat. Results are shuffled for
+// extra variety. Returns [] only when a page genuinely has nothing (end).
+const FEED_SOURCES = ['popular', 'top_rated', 'trending'];
+
 export async function feedPage(page = 1, mode = 'both') {
   if (isDemoMode()) return mock.feedPage(page, mode);
   const types = mode === 'tv' ? ['tv'] : mode === 'movie' ? ['movie'] : ['movie', 'tv'];
-  const lists = await Promise.all(types.map((t) => popular(t, page)));
+  const source = FEED_SOURCES[(page - 1) % FEED_SOURCES.length];
+  // Each source has its own page counter so we keep advancing through all of them.
+  const srcPage = Math.floor((page - 1) / FEED_SOURCES.length) + 1;
+  const lists = await Promise.all(
+    types.map((t) => fromSource(t, source, srcPage).catch(() => []))
+  );
   const max = Math.max(0, ...lists.map((l) => l.length));
   const out = [];
   for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
-  return out;
+  return shuffle(out);
 }
 
 export async function watchProviders(id, type) {

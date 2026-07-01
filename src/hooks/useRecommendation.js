@@ -25,7 +25,7 @@ export function useRecommendation() {
 
   function candidates() {
     return titles
-      .filter((t) => !t.watched && !t.disliked)
+      .filter((t) => !t.watched && !t.disliked && !t.dismissed)
       .filter(inMode)
       .map((t) => ({ ...t, _score: score(t, taste) * watchLaterBoost(t.id) }))
       .sort((a, b) => b._score - a._score);

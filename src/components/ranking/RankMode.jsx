@@ -84,12 +84,14 @@ export default function RankMode({ onExit }) {
     ensureBuffer().then(() => setLoading(false));
   }
 
-  // Initial load — seed known ids from anything already classified.
+  // Initial load — seed known ids from anything already classified. Start on a
+  // random source offset so each session doesn't open with the same titles.
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    page.current = Math.floor(Math.random() * 3);
     state.titles
-      .filter((t) => t.watched || t.disliked || t.watchLater)
+      .filter((t) => t.watched || t.disliked || t.watchLater || t.dismissed)
       .forEach((t) => knownIds.current.add(t.id));
     ensureBuffer().then(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,7 +105,7 @@ export default function RankMode({ onExit }) {
     exhausted.current = false;
     knownIds.current = new Set();
     state.titles
-      .filter((t) => t.watched || t.disliked || t.watchLater)
+      .filter((t) => t.watched || t.disliked || t.watchLater || t.dismissed)
       .forEach((t) => knownIds.current.add(t.id));
     setFeed([]);
     setI(0);
