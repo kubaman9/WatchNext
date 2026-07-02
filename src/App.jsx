@@ -63,11 +63,7 @@ export default function App() {
   return (
     <>
       {view === 'home' && (
-        <HomeScreen
-          onOpenDrawer={() => setDrawer(true)}
-          onNavigate={setView}
-          onToast={showToast}
-        />
+        <HomeScreen onOpenDrawer={() => setDrawer(true)} onNavigate={setView} onToast={showToast} />
       )}
       {view === 'list' && <MyList onExit={() => setView('home')} />}
       {view === 'watchlater' && <WatchLater onExit={() => setView('home')} />}

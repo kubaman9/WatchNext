@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useRecommendation } from '../../hooks/useRecommendation';
 import { useTitles } from '../../hooks/useTitles';
@@ -121,27 +121,47 @@ export default function HomeScreen({ onOpenDrawer, onNavigate, onToast }) {
           </button>
         </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center px-5 text-center">
-          <p className="mb-5 font-display text-2xl text-sub">{greeting()}</p>
-          <ModeToggle
-            value={mode}
-            onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })}
-            className="mb-6"
-          />
-          <button
+        <motion.main
+          className="flex flex-1 flex-col items-center justify-center px-5 text-center"
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } } }}
+        >
+          <motion.p
+            variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+            className="mb-5 font-display text-2xl text-sub"
+          >
+            {greeting()}
+          </motion.p>
+          <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="mb-6">
+            <ModeToggle
+              value={mode}
+              onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })}
+            />
+          </motion.div>
+          <motion.button
+            variants={{ hidden: { opacity: 0, y: 12, scale: 0.96 }, show: { opacity: 1, y: 0, scale: 1 } }}
             onClick={fire}
-            className="min-h-[64px] w-full max-w-[400px] rounded-2xl bg-accent px-8 py-5 font-display text-2xl text-white shadow-glow transition-shadow hover:shadow-[0_0_60px_-6px_rgba(225,29,42,0.8)] active:scale-[0.98]"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            className="animate-glow min-h-[64px] w-full max-w-[400px] rounded-2xl bg-accent px-8 py-5 font-display text-2xl text-white"
           >
             🎬 What Should I Watch?
-          </button>
-          <p className="mt-3 h-4 text-xs text-neutral">{countdown || 'A fresh pick is ready'}</p>
-          <button
+          </motion.button>
+          <motion.p
+            variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }}
+            className="mt-3 h-4 text-xs text-neutral"
+          >
+            {countdown || 'A fresh pick is ready'}
+          </motion.p>
+          <motion.button
+            variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }}
             onClick={() => onNavigate('rank')}
             className="mt-3 text-sm text-sub underline-offset-4 hover:text-txt hover:underline"
           >
             ⚡ Rank titles & build your list
-          </button>
-        </main>
+          </motion.button>
+        </motion.main>
 
         {recent.length > 0 && (
           <section className="relative z-10 shrink-0 px-5 pb-4">

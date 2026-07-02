@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import TitleDetail from './TitleDetail';
@@ -105,12 +105,21 @@ export default function MyList({ onExit }) {
       {!rows.length && <p className="mt-10 text-center text-sub">Nothing ranked yet.</p>}
 
       <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
-        {rows.map((t) => (
-          <li key={t.id}>
-            <button
-              onClick={() => setDetail(t)}
-              className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-2 text-left hover:border-accent"
+        <AnimatePresence initial={false}>
+          {rows.map((t, i) => (
+            <motion.li
+              key={t.id}
+              layout
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.02, 0.2) } }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.2 }}
             >
+              <motion.button
+                whileTap={{ scale: 0.985 }}
+                onClick={() => setDetail(t)}
+                className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-2 text-left hover:border-accent"
+              >
               <span className="w-8 shrink-0 text-center font-display text-lg text-sub">
                 #{rankOf(t.id)}
               </span>
@@ -145,9 +154,10 @@ export default function MyList({ onExit }) {
                 </span>
                 <span className="block text-[10px] uppercase tracking-wide text-neutral">/ 5</span>
               </span>
-            </button>
-          </li>
-        ))}
+              </motion.button>
+            </motion.li>
+          ))}
+        </AnimatePresence>
       </ul>
 
       {detail && <TitleDetail title={detail} onClose={() => setDetail(null)} />}

@@ -48,6 +48,21 @@ body {
   letter-spacing: 0.08em;
 }
 
+/* Living glow on the hero button — CSS (not Framer) so it never blocks
+   AnimatePresence exit transitions during screen navigation. */
+@keyframes glowPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 34px -10px rgba(225, 29, 42, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 56px -6px rgba(225, 29, 42, 0.9);
+  }
+}
+.animate-glow {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;

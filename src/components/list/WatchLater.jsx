@@ -24,6 +24,9 @@ function WatchLaterRow({ t, idx, onSeen, onRemove, onHandleDrag }) {
       dragListener={false}
       dragControls={controls}
       onDrag={(e, info) => onHandleDrag(info.point.y)}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
       whileDrag={{ scale: 1.03, boxShadow: '0 12px 30px -8px rgba(0,0,0,0.7)' }}
       className="flex items-center gap-3 rounded-lg border border-border bg-surface p-2"
     >

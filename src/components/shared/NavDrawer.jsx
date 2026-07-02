@@ -35,10 +35,19 @@ export default function NavDrawer({ open, current, onNavigate, onClose, user, on
                 ✕
               </button>
             </div>
-            <ul className="flex-1 space-y-1">
+            <motion.ul
+              className="flex-1 space-y-1"
+              initial="hidden"
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } } }}
+            >
               {ITEMS.map((item) => (
-                <li key={item.id}>
-                  <button
+                <motion.li
+                  key={item.id}
+                  variants={{ hidden: { opacity: 0, x: 20 }, show: { opacity: 1, x: 0 } }}
+                >
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
                     onClick={() => {
                       onNavigate(item.id);
                       onClose();
@@ -51,10 +60,10 @@ export default function NavDrawer({ open, current, onNavigate, onClose, user, on
                   >
                     <span>{item.icon}</span>
                     {item.label}
-                  </button>
-                </li>
+                  </motion.button>
+                </motion.li>
               ))}
-            </ul>
+            </motion.ul>
 
             {user && (
               <div className="border-t border-border pt-3">
