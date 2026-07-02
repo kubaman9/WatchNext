@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
-import { seedElo, estimateIndex, randomPrompt } from '../../utils/rating';
+import { seedElo, estimateIndex, eloForIndex, randomPrompt } from '../../utils/rating';
 import BattleArena from '../shared/BattleArena';
 
 // ── The one rating engine ─────────────────────────────────────────────────────
@@ -35,11 +35,14 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
   const minComparisons = thorough ? Math.min(5, ranked.length) : 0;
   const estTotal = Math.max(minComparisons, Math.ceil(Math.log2(ranked.length + 1)), 1);
 
+  // [lo, hi] is the range of insertion positions still consistent with the
+  // comparisons made so far. Every pick tightens it: beating the title at index i
+  // means "insert at or above i" (hi = min(hi, i)); losing means "below i"
+  // (lo = max(lo, i+1)). Placement is by position, never by raw Elo, so the final
+  // spot always respects each head-to-head choice.
   const lo = useRef(0);
   const hi = useRef(ranked.length);
   const used = useRef([]); // ranked ids already compared
-  const beat = useRef([]); // Elos of titles this one beat
-  const lost = useRef([]); // Elos of titles this one lost to
   const count = useRef(0);
   const [round, setRound] = useState(0);
   const [done, setDone] = useState(false);
@@ -100,58 +103,50 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
     });
   }
 
-  function record(opp, newWins) {
-    used.current.push(opp.id);
+  // Every comparison tightens the insertion window by the opponent's position.
+  function record(newWins) {
+    used.current.push(opponent.id);
     count.current += 1;
-    (newWins ? beat : lost).current.push(opp.eloScore ?? 1000);
-    // Narrow the binary window while it's still open.
-    if (hi.current - lo.current > 0) {
-      if (newWins) hi.current = pivot;
-      else lo.current = pivot + 1;
-    }
+    if (newWins) hi.current = Math.min(hi.current, pivot); // new goes at/above pivot
+    else lo.current = Math.max(lo.current, pivot + 1); // new goes below pivot
   }
 
   function handlePick(winner) {
-    const opp = opponent;
     const newWins = winner.id === title.id;
-    learn(newWins, opp);
-    record(opp, newWins);
+    learn(newWins, opponent);
+    record(newWins);
     setRound((r) => r + 1);
   }
 
   function handleNeither() {
-    // "About the same" — record no preference, just move on.
+    // "About the same" — no strong signal; narrow the larger half to converge.
     if (opponent) {
       used.current.push(opponent.id);
       count.current += 1;
-      if (hi.current - lo.current > 0) hi.current = Math.max(lo.current, pivot);
+      if (pivot - lo.current <= hi.current - pivot) lo.current = pivot + 1;
+      else hi.current = pivot;
     }
     setRound((r) => r + 1);
   }
 
-  // Place strictly between the highest Elo it beat and the lowest it lost to.
-  function bracketElo() {
-    const lower = beat.current.length ? Math.max(...beat.current) : null;
-    const upper = lost.current.length ? Math.min(...lost.current) : null;
-    if (lower != null && upper != null) return Math.round((lower + upper) / 2);
-    if (lower != null) return lower + 30;
-    if (upper != null) return upper - 30;
-    return seedRef.current;
+  // Final insertion index consistent with every pick. If picks were
+  // non-transitive (lo > hi), fall back to the tighter (win-constrained) bound.
+  function finalIndex() {
+    const idx = lo.current <= hi.current ? lo.current : hi.current;
+    return Math.max(0, Math.min(ranked.length, idx));
   }
 
-  // One-shot "I love this": a decisive but modest lift ABOVE this opponent.
+  // One-shot "I love this": place it just above the current opponent — decisive
+  // but modest (not to the top of the list).
   function handleMega() {
     if (megaUsed || !opponent) return;
     setMegaUsed(true);
     learn(true, opponent);
-    const above = ranked[pivot - 1];
-    let elo = (opponent.eloScore ?? 1000) + 45;
-    if (above) elo = Math.min(elo, (above.eloScore ?? 1000) - 1);
-    finalizeWithElo(elo);
+    finalizeWithElo(ranked.length ? eloForIndex(pivot, ranked) : seedRef.current);
   }
 
   function finalize() {
-    finalizeWithElo(ranked.length ? bracketElo() : seedRef.current);
+    finalizeWithElo(ranked.length ? eloForIndex(finalIndex(), ranked) : seedRef.current);
   }
   function finalizeWithElo(elo) {
     dispatch({ type: 'SET_ELO', id: title.id, elo });
