@@ -83,6 +83,21 @@ export async function feedPage(page = 1, mode = 'both') {
   return ALL.filter((t) => mode === 'both' || t.type === mode).map((t) => ({ ...t }));
 }
 
+export async function discoverByGenres(type, genreIds, page = 1) {
+  if (page > 1) return [];
+  return ALL.filter((t) => t.type === type && t.genreIds.some((g) => genreIds.includes(g))).map((t) => ({
+    ...t,
+  }));
+}
+
+export async function similarTo(id, type) {
+  const anchor = ALL.find((t) => t.id === id);
+  if (!anchor) return [];
+  return ALL.filter((t) => t.id !== id && t.type === type && t.genreIds.some((g) => anchor.genreIds.includes(g))).map(
+    (t) => ({ ...t })
+  );
+}
+
 export async function watchProviders() {
   const sample = ['Netflix', 'Max', 'Prime Video', 'Disney+', 'Hulu'];
   return sample.slice(0, 2 + Math.floor(Math.random() * 2));

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import GenreBadge from './GenreBadge';
 import TypeBadge from './TypeBadge';
 
@@ -9,11 +9,46 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
+const SPARKLES = ['✦', '★', '✧'];
+
+function WinBurst() {
+  // Compute each sparkle's target ONCE per mount (useMemo, not inline in render).
+  // Recomputing random targets on every re-render would hand Framer Motion a new
+  // `animate` object each time, restarting the tween indefinitely — which can
+  // stall the parent AnimatePresence exit transition and freeze the whole card.
+  const sparkles = useMemo(
+    () =>
+      Array.from({ length: 6 }, (_, i) => {
+        const angle = (i / 6) * Math.PI * 2;
+        const dist = 60 + Math.random() * 30;
+        return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist - 20 };
+      }),
+    []
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-visible">
+      {sparkles.map((s, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 1, scale: 0.4, x: 0, y: 0 }}
+          animate={{ opacity: 0, scale: 1.1, x: s.x, y: s.y }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="absolute left-1/2 top-1/2 text-lg text-gold"
+        >
+          {SPARKLES[i % SPARKLES.length]}
+        </motion.span>
+      ))}
+    </div>
+  );
+}
+
 function Card({ title, side, highlighted, winner, loser, onPick }) {
   return (
     <motion.button
       type="button"
       onClick={onPick}
+      whileHover={!winner && !loser ? { y: -3 } : {}}
+      whileTap={!winner && !loser ? { scale: 0.97 } : {}}
       animate={
         winner ? { scale: 1.05 } : loser ? { opacity: 0.3, scale: 0.95 } : { scale: 1 }
       }
@@ -23,6 +58,7 @@ function Card({ title, side, highlighted, winner, loser, onPick }) {
       }`}
       aria-label={`Pick ${title.title} (${side})`}
     >
+      {winner && <WinBurst />}
       <div className="aspect-[2/3] w-full">
         <img
           src={title.poster || FALLBACK}
@@ -94,59 +130,70 @@ export default function BattleArena({
     <div className="flex w-full max-w-3xl flex-col items-center gap-4">
       {progress != null && (
         <div className="h-1 w-full overflow-hidden rounded-full bg-border">
-          <div
-            className="h-full bg-accent transition-all duration-300"
-            style={{ width: `${progress * 100}%` }}
+          <motion.div
+            className="h-full bg-accent"
+            initial={false}
+            animate={{ width: `${progress * 100}%` }}
+            transition={{ type: 'spring', stiffness: 200, damping: 30 }}
           />
         </div>
       )}
       {prompt && (
         <h2 className="text-center font-display text-xl text-txt sm:text-3xl">{prompt}</h2>
       )}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${left.id}-${right.id}`}
-          initial={{ opacity: 0, x: 40 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -40 }}
-          transition={{ duration: 0.25 }}
-          className="flex w-full flex-row items-stretch gap-3"
-        >
-          <Card
-            title={left}
-            side="left"
-            highlighted={hover === 'left'}
-            winner={picked === 'left'}
-            loser={picked === 'right'}
-            onPick={() => choose('left')}
-          />
-          <Card
-            title={right}
-            side="right"
-            highlighted={hover === 'right'}
-            winner={picked === 'right'}
-            loser={picked === 'left'}
-            onPick={() => choose('right')}
-          />
-        </motion.div>
-      </AnimatePresence>
+      {/* Plain keyed remount (no AnimatePresence) for the pair swap — the old
+          pair disappears instantly and the new one fades/slides in via its own
+          `initial`/`animate`. We deliberately don't wait for an exit animation
+          here: an AnimatePresence `mode="wait"` exit that depends on nested
+          animating children settling can stall indefinitely and freeze the
+          whole battle on a round transition — not worth the trade for a
+          same-instant swap that's already fast and readable. */}
+      <motion.div
+        key={`${left.id}-${right.id}`}
+        initial={{ opacity: 0, x: 40 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.25 }}
+        className="flex w-full flex-row items-stretch gap-3"
+      >
+        <Card
+          title={left}
+          side="left"
+          highlighted={hover === 'left'}
+          winner={picked === 'left'}
+          loser={picked === 'right'}
+          onPick={() => choose('left')}
+        />
+        <Card
+          title={right}
+          side="right"
+          highlighted={hover === 'right'}
+          winner={picked === 'right'}
+          loser={picked === 'left'}
+          onPick={() => choose('right')}
+        />
+      </motion.div>
       {onMega && (
-        <button
+        <motion.button
           type="button"
           onClick={onMega}
-          className="w-full max-w-xs rounded-full bg-gradient-to-r from-accent-deep via-accent to-gold py-2.5 text-sm font-semibold text-white shadow-glow active:scale-95"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{ opacity: [0.85, 1, 0.85] }}
+          transition={{ opacity: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } }}
+          className="w-full max-w-xs rounded-full bg-gradient-to-r from-accent-deep via-accent to-gold py-2.5 text-sm font-semibold text-white shadow-glow"
         >
           {megaLabel}
-        </button>
+        </motion.button>
       )}
       {onNeither && (
-        <button
+        <motion.button
           type="button"
           onClick={onNeither}
+          whileTap={{ scale: 0.95 }}
           className="text-sm text-neutral transition-colors hover:text-sub"
         >
           {neitherLabel}
-        </button>
+        </motion.button>
       )}
     </div>
   );

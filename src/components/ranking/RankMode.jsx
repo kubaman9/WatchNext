@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import { feedPage } from '../../services/tmdbApi';
@@ -21,6 +21,25 @@ function pairKey(a, b) {
   return [a.id, b.id].sort().join('|');
 }
 
+// Derive what to personalize Discover around: the genres the user has actually
+// leaned toward (weight meaningfully above neutral) and their highest-ranked
+// watched titles (used for TMDB's "similar to X" — this is what makes a Nolan-
+// heavy library surface more Nolan-adjacent thrillers instead of random anime).
+function buildTasteContext(state) {
+  const weights = state.taste.genreWeights || {};
+  const topGenreIds = Object.entries(weights)
+    .filter(([, w]) => w > 1.06)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([id]) => Number(id));
+  const anchors = state.titles
+    .filter((t) => t.watched && !t.disliked)
+    .sort((a, b) => (b.eloScore ?? 1000) - (a.eloScore ?? 1000))
+    .slice(0, 5)
+    .map((t) => ({ id: t.id, type: t.type }));
+  return { topGenreIds, anchors };
+}
+
 export default function RankMode({ onExit }) {
   const { state, dispatch } = useApp();
   const { watched } = useTitles();
@@ -40,6 +59,14 @@ export default function RankMode({ onExit }) {
   const sinceRerank = useRef(0);
   const shownPairs = useRef(new Set()); // avoid repeating the same re-rank matchup
   const started = useRef(false);
+  const tasteRef = useRef(buildTasteContext(state));
+
+  // Keep the taste snapshot current as the library grows, without changing
+  // ensureBuffer's identity (it reads the ref, not a dependency).
+  useEffect(() => {
+    tasteRef.current = buildTasteContext(state);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.taste.genreWeights, state.titles]);
 
   const ensureBuffer = useCallback(async () => {
     if (loadingMore.current || exhausted.current) return;
@@ -53,7 +80,7 @@ export default function RankMode({ onExit }) {
       // pages scanned per call so we don't spin forever if truly exhausted.
       while (added < 12 && page.current - startPage < 12) {
         page.current += 1;
-        const titles = await feedPage(page.current, modeRef.current);
+        const titles = await feedPage(page.current, modeRef.current, tasteRef.current);
         if (!titles.length) {
           exhausted.current = true;
           break;
@@ -202,6 +229,9 @@ export default function RankMode({ onExit }) {
     }
   }
 
+  // Buttons and keys call the state handlers directly (not the card's ref-based
+  // fly animation — that path proved unreliable, so drag is the only trigger for
+  // the fling; buttons still get their own tap/hover feedback).
   useEffect(() => {
     function onKey(e) {
       if (flow) return;
@@ -216,69 +246,86 @@ export default function RankMode({ onExit }) {
 
   return (
     <div className="mx-auto flex h-screen max-w-md flex-col px-5 py-4">
-      <div className="flex shrink-0 items-center justify-between">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex shrink-0 items-center justify-between"
+      >
         <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
           ←
         </button>
         <span className="font-display text-lg text-txt">Discover</span>
         <span className="w-6" />
-      </div>
+      </motion.div>
 
-      <ModeToggle
-        value={mode}
-        onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
         className="mx-auto mt-3 shrink-0"
-      />
+      >
+        <ModeToggle value={mode} onChange={(m) => dispatch({ type: 'SET_SETTINGS', payload: { mode: m } })} />
+      </motion.div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
         {loading && <div className="h-full max-h-[46vh] w-full animate-pulse rounded-2xl bg-surface" />}
         {!loading && error && !card && (
-          <div className="text-center text-sub">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="text-center text-sub">
             <p className="font-display text-xl text-txt">Couldn’t load titles.</p>
             <p className="mt-1 text-sm">Check your connection or TMDB key.</p>
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={retry}
-              className="mt-4 rounded-xl bg-accent px-6 py-2.5 font-semibold text-white active:scale-95"
+              className="mt-4 rounded-xl bg-accent px-6 py-2.5 font-semibold text-white"
             >
               Retry
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         )}
         {!loading && !error && !card && (
-          <div className="text-center text-sub">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="text-center text-sub">
             <p className="font-display text-2xl text-txt">That’s everything for now.</p>
             <p className="mt-1">Check back soon for more titles.</p>
-          </div>
+          </motion.div>
         )}
-        {card && (
-          <SwipeCard key={card.id} card={card} onYes={yes} onLater={no} onNo={notInterested} />
-        )}
+        {card && <SwipeCard key={card.id} card={card} onYes={yes} onLater={no} onNo={notInterested} />}
       </div>
 
       {card && (
-        <div className="shrink-0 space-y-2 pb-1">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="shrink-0 space-y-2 pb-1"
+        >
           <p className="text-center text-sm text-sub">Have you seen this?</p>
-          <button
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.01 }}
             onClick={yes}
-            className="w-full rounded-xl bg-win py-3 font-semibold text-white transition-transform active:scale-95"
+            className="w-full rounded-xl bg-win py-3 font-semibold text-white"
           >
             Yes — rank it
-          </button>
+          </motion.button>
           <div className="flex gap-2">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.01 }}
               onClick={no}
-              className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent transition-transform active:scale-95"
+              className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent"
             >
               Add to Watch Later
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.01 }}
               onClick={notInterested}
-              className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub transition-transform active:scale-95"
+              className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub"
             >
               Not Interested
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
       )}
 
       <AnimatePresence>

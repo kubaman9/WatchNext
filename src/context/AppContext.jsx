@@ -7,7 +7,13 @@ const AppContext = createContext(null);
 
 const initialState = {
   titles: [],
-  taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false, baseline: 1000 },
+  taste: {
+    genreWeights: {},
+    totalBattles: 0,
+    onboardingComplete: false,
+    baseline: 1000,
+    tasteVersion: 0,
+  },
   settings: { mode: 'both' }, // 'movie' | 'tv' | 'both'
   watchLater: [], // ordered array of title ids — user's manual Watch Later order
 };
@@ -180,7 +186,13 @@ function reducer(state, action) {
       return {
         ...state,
         titles,
-        taste: { genreWeights: {}, totalBattles: 0, onboardingComplete: false, baseline: 1000 },
+        taste: {
+          genreWeights: {},
+          totalBattles: 0,
+          onboardingComplete: false,
+          baseline: 1000,
+          tasteVersion: 0,
+        },
       };
     }
 

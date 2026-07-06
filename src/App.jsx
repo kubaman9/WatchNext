@@ -3,8 +3,10 @@ import { useApp } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
 import { useCloudSync } from './hooks/useCloudSync';
 import { loadGenres } from './services/tmdbApi';
+import { TASTE_VERSION } from './utils/rating';
 import AuthScreen from './components/auth/AuthScreen';
 import Onboarding from './components/onboarding/Onboarding';
+import RebasePrompt from './components/onboarding/RebasePrompt';
 import HomeScreen from './components/home/HomeScreen';
 import RankMode from './components/ranking/RankMode';
 import MyList from './components/list/MyList';
@@ -60,6 +62,10 @@ export default function App() {
     );
   }
 
+  // Accounts onboarded under an older taste-calibration method get a one-time
+  // prompt to rebase. Rendered over the normal app, not blocking navigation.
+  const needsRebase = (state.taste.tasteVersion ?? 0) < TASTE_VERSION;
+
   return (
     <>
       {view === 'home' && (
@@ -80,6 +86,13 @@ export default function App() {
         user={user}
         onLogout={logout}
       />
+      {needsRebase && (
+        <RebasePrompt
+          onDone={(rebased) => {
+            if (rebased) showToast('Taste calibration updated.');
+          }}
+        />
+      )}
       <Toast message={toast} />
     </>
   );

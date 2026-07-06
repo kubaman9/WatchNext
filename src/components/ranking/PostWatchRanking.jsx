@@ -160,22 +160,43 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
     const { above, below } = neighbors(title.id);
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, scale: 0.8, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 20 }}
         className="flex flex-col items-center gap-3 text-center"
       >
+        <motion.span
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.1, type: 'spring', stiffness: 400, damping: 14 }}
+          className="text-4xl"
+        >
+          {rank === 1 ? '👑' : '✓'}
+        </motion.span>
         <div className="font-display text-3xl text-txt">
           {title.title} lands at {rank ? `#${rank}` : 'your list'}
         </div>
         {rating != null && (
-          <div className="font-display text-xl text-accent">{rating.toFixed(1)} / 5</div>
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="font-display text-xl text-accent"
+          >
+            {rating.toFixed(1)} / 5
+          </motion.div>
         )}
-        <div className="text-sm text-sub">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-sm text-sub"
+        >
           {below && <span>↑ above {below.title}</span>}
           {above && below && <span> · </span>}
           {above && <span>↓ below {above.title}</span>}
           {!above && !below && <span>First in your list 🎉</span>}
-        </div>
+        </motion.div>
       </motion.div>
     );
   }
@@ -185,9 +206,14 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
   return (
     <>
       {thorough && (
-        <p className="mb-3 text-center text-xs uppercase tracking-wider text-sub">
+        <motion.p
+          key={count.current}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3 text-center text-xs uppercase tracking-wider text-sub"
+        >
           Careful re-rank · comparison {count.current + 1}
-        </p>
+        </motion.p>
       )}
       <BattleArena
         left={title}

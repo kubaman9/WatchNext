@@ -132,6 +132,43 @@ async function fromSource(type, source, page) {
     .map((r) => normalize({ ...r, media_type: type }));
 }
 
+// Titles matching ANY of the given genres (OR, via TMDB's `|` separator),
+// sorted by popularity and filtered to a minimum vote count so obscure noise
+// doesn't dominate. This is the "more of what you actually favor" lever.
+export async function discoverByGenres(type, genreIds, page = 1) {
+  if (isDemoMode()) return mock.discoverByGenres(type, genreIds, page);
+  if (!genreIds.length) return popular(type, page);
+  try {
+    const json = await get(`/discover/${type}`, {
+      with_genres: genreIds.join('|'),
+      sort_by: 'popularity.desc',
+      'vote_count.gte': 75,
+      page,
+    });
+    return (json.results || [])
+      .filter((r) => r.poster_path)
+      .map((r) => normalize({ ...r, media_type: type }));
+  } catch {
+    return [];
+  }
+}
+
+// TMDB's own "similar titles" for a specific title the user rated highly — this
+// is what actually captures "more like Inception/Interstellar" rather than a
+// generic genre match, so a library full of one director's films surfaces more
+// of that same vein instead of unrelated genre-only matches.
+export async function similarTo(id, type) {
+  if (isDemoMode()) return mock.similarTo(id, type);
+  try {
+    const json = await get(`/${type}/${id}/similar`);
+    return (json.results || [])
+      .filter((r) => r.poster_path)
+      .map((r) => normalize({ ...r, media_type: type }));
+  } catch {
+    return [];
+  }
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -155,24 +192,69 @@ export async function buildPool(size = 50) {
   return out;
 }
 
-// Rotate the source each page so Discover isn't just the same popularity list —
-// popular, then top-rated, then trending, and repeat. Results are shuffled for
-// extra variety. Returns [] only when a page genuinely has nothing (end).
+// Rotate the source each page so the exploration slice of Discover isn't just
+// the same popularity list — popular, then top-rated, then trending, repeat.
 const FEED_SOURCES = ['popular', 'top_rated', 'trending'];
 
-export async function feedPage(page = 1, mode = 'both') {
-  if (isDemoMode()) return mock.feedPage(page, mode);
+// Discover feed for Rank Mode's infinite swipe deck. `taste` (optional) is
+// { topGenreIds, anchors } derived from the user's actual watched/high-ranked
+// titles — when present, ~2/3 of each page is personalized (genre match +
+// TMDB's own "similar to X" for top-ranked titles) and ~1/3 stays generic
+// popular/top-rated/trending for exploration. With no taste signal yet (fresh
+// account), it falls back to the old fully-generic rotation.
+export async function feedPage(page = 1, mode = 'both', taste = null) {
+  if (isDemoMode()) return mock.feedPage(page, mode, taste);
   const types = mode === 'tv' ? ['tv'] : mode === 'movie' ? ['movie'] : ['movie', 'tv'];
+
+  const topGenreIds = taste?.topGenreIds || [];
+  const anchors = (taste?.anchors || []).filter((a) => mode === 'both' || a.type === mode);
+
+  const personalized = [];
+  if (topGenreIds.length) {
+    const genrePage = Math.max(1, Math.ceil(page / 2));
+    const lists = await Promise.all(
+      types.map((t) => discoverByGenres(t, topGenreIds, genrePage).catch(() => []))
+    );
+    personalized.push(...lists.flat());
+  }
+  if (anchors.length) {
+    const anchor = anchors[(page - 1) % anchors.length];
+    if (anchor) personalized.push(...(await similarTo(anchor.id, anchor.type).catch(() => [])));
+  }
+
   const source = FEED_SOURCES[(page - 1) % FEED_SOURCES.length];
-  // Each source has its own page counter so we keep advancing through all of them.
   const srcPage = Math.floor((page - 1) / FEED_SOURCES.length) + 1;
-  const lists = await Promise.all(
+  const diverseLists = await Promise.all(
     types.map((t) => fromSource(t, source, srcPage).catch(() => []))
   );
-  const max = Math.max(0, ...lists.map((l) => l.length));
+  const diverse = diverseLists.flat();
+
+  if (!personalized.length) return shuffle(diverse);
+
+  // Interleave roughly 2 personalized : 1 diverse, de-duped, then light shuffle
+  // within each tier so it isn't the exact same order every time.
+  const p = shuffle(personalized);
+  const d = shuffle(diverse);
+  const seen = new Set();
   const out = [];
-  for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
-  return shuffle(out);
+  let pi = 0,
+    di = 0;
+  while (pi < p.length || di < d.length) {
+    for (let k = 0; k < 2 && pi < p.length; k++, pi++) {
+      if (!seen.has(p[pi].id)) {
+        seen.add(p[pi].id);
+        out.push(p[pi]);
+      }
+    }
+    if (di < d.length) {
+      if (!seen.has(d[di].id)) {
+        seen.add(d[di].id);
+        out.push(d[di]);
+      }
+      di++;
+    }
+  }
+  return out;
 }
 
 export async function watchProviders(id, type) {

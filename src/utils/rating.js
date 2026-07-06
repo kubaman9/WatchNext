@@ -2,6 +2,11 @@ import { genreMultiplier } from './scoring';
 
 export const RATING_MAX = 5;
 
+// Bump this whenever the taste-calibration method changes meaningfully (e.g.
+// switching from a manual baseline rating to a pick-5-and-battle system).
+// Accounts onboarded under an older version get a one-time prompt to rebase.
+export const TASTE_VERSION = 2;
+
 // ── Baseline <-> rating mapping (out of 5) ────────────────────────────────────
 // A 1–5 personal baseline maps onto the Elo scale. 5 → 1400, 3 → 980, 1 → 560.
 export function ratingToElo(rating) {

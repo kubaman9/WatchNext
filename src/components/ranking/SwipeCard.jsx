@@ -13,7 +13,8 @@ const THRESHOLD = 110;
 
 // Tinder-style card: drag to swipe (right = Yes, up = Watch Later, left = Not
 // Interested) with live rotation and directional hint labels. Buttons in the
-// parent call the same onYes/onLater/onNo directly.
+// parent call onYes/onLater/onNo directly (a prior ref-based imperative trigger
+// here proved unreliable, so drag is the only path into the fling animation).
 export default function SwipeCard({ card, onYes, onLater, onNo }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);

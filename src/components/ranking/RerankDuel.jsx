@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import BattleArena from '../shared/BattleArena';
 
@@ -18,7 +19,13 @@ export default function RerankDuel({ a, b, onDone }) {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-xs uppercase tracking-wider text-gold">Quick re-rank</p>
+      <motion.p
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-xs uppercase tracking-wider text-gold"
+      >
+        ⚡ Quick re-rank
+      </motion.p>
       <BattleArena
         left={a}
         right={b}

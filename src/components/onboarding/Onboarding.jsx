@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePool } from '../../hooks/useTmdb';
-import RecentlyWatched from './RecentlyWatched';
-import RatingAnchor from './RatingAnchor';
+import PickPopular from './PickPopular';
 import TasteBattles from './TasteBattles';
-import { ratingToElo } from '../../utils/rating';
+import { TASTE_VERSION } from '../../utils/rating';
 
+// Two steps: pick 5 titles you've actually watched (from a browsable popular
+// list), then a battle round that establishes real relative taste — replaces
+// the old single manual "rate 1-5" baseline entirely.
 export default function Onboarding({ onDone }) {
   const { dispatch } = useApp();
   const buildPool = usePool();
-  const [step, setStep] = useState(1); // 1 | 'rate' | 'battles'
+  const [step, setStep] = useState(1); // 1 | 'battles'
   const [recent, setRecent] = useState([]);
 
   function step1Continue(selected) {
@@ -18,15 +20,6 @@ export default function Onboarding({ onDone }) {
       dispatch({ type: 'MARK_WATCHED', id: t.id });
     });
     setRecent(selected);
-    setStep('rate');
-  }
-
-  // Anchor the scale to the first title's 1–10 rating: set its Elo and store the
-  // personal baseline that the rating engine centers every future placement on.
-  function rateContinue(rating) {
-    const elo = ratingToElo(rating);
-    if (recent[0]) dispatch({ type: 'SET_ELO', id: recent[0].id, elo });
-    dispatch({ type: 'SET_TASTE', payload: { baseline: elo } });
     setStep('battles');
   }
 
@@ -34,6 +27,7 @@ export default function Onboarding({ onDone }) {
     const titles = await buildPool(15);
     dispatch({ type: 'ADD_TITLES', titles });
     dispatch({ type: 'COMPLETE_ONBOARDING' });
+    dispatch({ type: 'SET_TASTE', payload: { tasteVersion: TASTE_VERSION } });
     onDone();
   }
 
@@ -42,7 +36,6 @@ export default function Onboarding({ onDone }) {
     onDone(true);
   }
 
-  if (step === 1) return <RecentlyWatched onContinue={step1Continue} onSkip={skipAll} />;
-  if (step === 'rate') return <RatingAnchor title={recent[0]} onDone={rateContinue} />;
+  if (step === 1) return <PickPopular onContinue={step1Continue} onSkip={skipAll} />;
   return <TasteBattles recentlyWatched={recent} onComplete={finishBattles} />;
 }

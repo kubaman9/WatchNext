@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getApiKey, setApiKey, usingFallbackKey } from '../../services/tmdbApi';
 import { ratingToElo, eloToRating } from '../../utils/rating';
 import ModeToggle from '../shared/ModeToggle';
+import RebasePrompt from '../onboarding/RebasePrompt';
 
 export default function Settings({ onExit, onResetTaste }) {
   const { state, dispatch } = useApp();
   const [key, setKey] = useState(usingFallbackKey() ? '' : getApiKey());
   const [confirmReset, setConfirmReset] = useState(false);
+  const [rebasing, setRebasing] = useState(false);
   const baseline = eloToRating(state.taste.baseline || 1000);
 
   function exportList() {
@@ -62,6 +65,12 @@ export default function Settings({ onExit, onResetTaste }) {
           />
           <span className="w-12 text-right font-display text-xl text-accent">{baseline}/5</span>
         </div>
+        <button
+          onClick={() => setRebasing(true)}
+          className="mt-1 w-full rounded-lg border border-border bg-surface py-2.5 text-sm text-txt hover:border-accent"
+        >
+          🎯 Re-run taste calibration
+        </button>
       </section>
 
       <section className="mt-6 space-y-2">
@@ -117,6 +126,10 @@ export default function Settings({ onExit, onResetTaste }) {
           </div>
         )}
       </section>
+
+      <AnimatePresence>
+        {rebasing && <RebasePrompt autoStart onDone={() => setRebasing(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
