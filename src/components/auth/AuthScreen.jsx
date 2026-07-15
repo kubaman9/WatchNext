@@ -26,7 +26,7 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-5">
+    <div className="flex min-h-dvh items-center justify-center px-5">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

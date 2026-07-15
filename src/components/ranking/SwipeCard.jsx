@@ -11,11 +11,17 @@ const FALLBACK =
 
 const THRESHOLD = 110;
 
-// Tinder-style card: drag to swipe (right = Yes, up = Watch Later, left = Not
-// Interested) with live rotation and directional hint labels. Buttons in the
-// parent call onYes/onLater/onNo directly (a prior ref-based imperative trigger
-// here proved unreliable, so drag is the only path into the fling animation).
-export default function SwipeCard({ card, onYes, onLater, onNo }) {
+// Tinder-style card: drag to swipe (right = onYes, up = onLater, left = onNo)
+// with live rotation and directional hint labels. Buttons in the parent call
+// onYes/onLater/onNo directly (a prior ref-based imperative trigger here proved
+// unreliable, so drag is the only path into the fling animation).
+// variant="watchLater" restyles it gold with SEEN / KEEP / REMOVE hints for
+// resurfaced Watch Later titles.
+export default function SwipeCard({ card, onYes, onLater, onNo, variant = 'discover' }) {
+  const isWL = variant === 'watchLater';
+  const hints = isWL
+    ? { right: 'SEEN', up: 'KEEP', left: 'REMOVE' }
+    : { right: 'SEEN', up: 'WATCH LATER', left: 'PASS' };
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-240, 240], [-14, 14]);
@@ -70,34 +76,48 @@ export default function SwipeCard({ card, onYes, onLater, onNo }) {
       onDragEnd={onDragEnd}
       style={{ x, y, rotate }}
       animate={controls}
-      className="relative flex w-full cursor-grab touch-none select-none flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-card active:cursor-grabbing"
+      // Card width is derived from the viewport HEIGHT budget (poster ≈ 40dvh at
+      // 2:3), capped by available width — so the poster renders its full frame
+      // on desktop (no vertical crop) and never overflows short mobile screens.
+      className={`relative flex w-[calc(40dvh*2/3)] max-w-full cursor-grab touch-none select-none flex-col overflow-hidden rounded-2xl border bg-surface shadow-card active:cursor-grabbing ${
+        isWL ? 'border-gold/70' : 'border-border'
+      }`}
     >
-      <img
-        src={card.poster || FALLBACK}
-        alt={card.title}
-        draggable="false"
-        onError={(e) => (e.currentTarget.src = FALLBACK)}
-        className="pointer-events-none max-h-[42vh] w-full object-cover"
-      />
+      {isWL && (
+        <span className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-gold px-3 py-0.5 text-xs font-semibold text-black">
+          🔖 Watch Later
+        </span>
+      )}
+      <div className="relative aspect-[2/3] w-full">
+        <img
+          src={card.poster || FALLBACK}
+          alt={card.title}
+          draggable="false"
+          onError={(e) => (e.currentTarget.src = FALLBACK)}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        />
+      </div>
 
       {/* directional hints */}
       <motion.div
         style={{ opacity: yesOp }}
         className="pointer-events-none absolute left-3 top-3 rotate-[-12deg] rounded-lg border-2 border-win px-3 py-1 font-display text-xl text-win"
       >
-        SEEN
+        {hints.right}
       </motion.div>
       <motion.div
         style={{ opacity: noOp }}
         className="pointer-events-none absolute right-3 top-3 rotate-[12deg] rounded-lg border-2 border-sub px-3 py-1 font-display text-xl text-sub"
       >
-        PASS
+        {hints.left}
       </motion.div>
       <motion.div
         style={{ opacity: laterOp }}
-        className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-lg border-2 border-accent px-3 py-1 font-display text-xl text-accent"
+        className={`pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-lg border-2 px-3 py-1 font-display text-xl ${
+          isWL ? 'border-gold text-gold' : 'border-accent text-accent'
+        }`}
       >
-        WATCH LATER
+        {hints.up}
       </motion.div>
 
       <div className="p-3">

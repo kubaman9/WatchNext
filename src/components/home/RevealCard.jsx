@@ -11,7 +11,18 @@ const FALLBACK =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" fill="#13131A"/></svg>`
   );
 
-export default function RevealCard({ title, skipStreak, onWatch, onSkip, onDislike, onClose, onRankNudge }) {
+// `onWatchLater` (optional) switches the card into coming-soon mode: the primary
+// action becomes "Add to Watch Later" instead of "Watch This".
+export default function RevealCard({
+  title,
+  skipStreak,
+  onWatch,
+  onSkip,
+  onDislike,
+  onClose,
+  onRankNudge,
+  onWatchLater,
+}) {
   const providers = useProviders(title.id, title.type);
   const [expanded, setExpanded] = useState(false);
   useEscape(onClose);
@@ -40,14 +51,23 @@ export default function RevealCard({ title, skipStreak, onWatch, onSkip, onDisli
           key={title.id}
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="mt-2 overflow-hidden rounded-xl border border-border shadow-card"
+          // Width derived from height budget keeps the poster an exact 2:3 —
+          // never cropped on desktop, never oversized on mobile.
+          className="mx-auto mt-2 w-[calc(42dvh*2/3)] max-w-full overflow-hidden rounded-xl border border-border shadow-card"
         >
-          <img
-            src={title.poster || FALLBACK}
-            alt={title.title}
-            onError={(e) => (e.currentTarget.src = FALLBACK)}
-            className="max-h-[45vh] w-full object-cover"
-          />
+          <div className="relative aspect-[2/3] w-full">
+            <img
+              src={title.poster || FALLBACK}
+              alt={title.title}
+              onError={(e) => (e.currentTarget.src = FALLBACK)}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            {onWatchLater && title.releaseDate && (
+              <span className="absolute left-2 top-2 rounded-full bg-gold px-2.5 py-0.5 text-xs font-semibold text-black">
+                {title.releaseDate}
+              </span>
+            )}
+          </div>
         </motion.div>
 
         <h1 className="mt-4 font-display text-3xl leading-tight text-txt">{title.title}</h1>
@@ -90,20 +110,29 @@ export default function RevealCard({ title, skipStreak, onWatch, onSkip, onDisli
         )}
 
         <div className="mt-6 flex gap-3">
-          <button
-            onClick={onWatch}
-            className="flex-1 rounded-xl bg-win py-4 font-semibold text-white transition-transform active:scale-95"
-          >
-            ✓ Watch This
-          </button>
+          {onWatchLater ? (
+            <button
+              onClick={onWatchLater}
+              className="flex-1 rounded-xl bg-gold py-4 font-semibold text-black transition-transform active:scale-95"
+            >
+              🔖 Add to Watch Later
+            </button>
+          ) : (
+            <button
+              onClick={onWatch}
+              className="flex-1 rounded-xl bg-win py-4 font-semibold text-white transition-transform active:scale-95"
+            >
+              ✓ Watch This
+            </button>
+          )}
           <button
             onClick={onSkip}
             className="rounded-xl border border-border bg-surface px-6 py-4 font-medium text-sub transition-transform active:scale-95 hover:text-txt"
           >
-            Not Now →
+            {onWatchLater ? 'Close' : 'Not Now →'}
           </button>
         </div>
-        {onDislike && (
+        {onDislike && !onWatchLater && (
           <button
             onClick={onDislike}
             className="mt-3 self-center text-sm text-neutral hover:text-sub"

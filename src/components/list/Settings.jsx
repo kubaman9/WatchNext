@@ -1,27 +1,14 @@
 import { useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { getApiKey, setApiKey, usingFallbackKey } from '../../services/tmdbApi';
-import { ratingToElo, eloToRating } from '../../utils/rating';
 import ModeToggle from '../shared/ModeToggle';
-import RebasePrompt from '../onboarding/RebasePrompt';
 
 export default function Settings({ onExit, onResetTaste }) {
   const { state, dispatch } = useApp();
+  const { user, logout } = useAuth();
   const [key, setKey] = useState(usingFallbackKey() ? '' : getApiKey());
   const [confirmReset, setConfirmReset] = useState(false);
-  const [rebasing, setRebasing] = useState(false);
-  const baseline = eloToRating(state.taste.baseline || 1000);
-
-  function exportList() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'watchnext-export.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 
   function saveKey() {
     setApiKey(key.trim());
@@ -29,7 +16,7 @@ export default function Settings({ onExit, onResetTaste }) {
   }
 
   return (
-    <div className="mx-auto h-screen max-w-xl overflow-y-auto px-5 py-5">
+    <div className="mx-auto h-full max-w-xl overflow-y-auto px-5 py-5">
       <div className="flex items-center gap-3">
         <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
           ←
@@ -44,33 +31,6 @@ export default function Settings({ onExit, onResetTaste }) {
           value={state.settings.mode || 'both'}
           onChange={(mode) => dispatch({ type: 'SET_SETTINGS', payload: { mode } })}
         />
-      </section>
-
-      <section className="mt-6 space-y-2">
-        <h2 className="text-sm uppercase tracking-wider text-sub">Baseline rating</h2>
-        <p className="text-sm text-sub">
-          Where your scale centers — the rating engine seeds every new title around this.
-        </p>
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min="1"
-            max="5"
-            step="1"
-            value={baseline}
-            onChange={(e) =>
-              dispatch({ type: 'SET_TASTE', payload: { baseline: ratingToElo(Number(e.target.value)) } })
-            }
-            className="flex-1 accent-accent"
-          />
-          <span className="w-12 text-right font-display text-xl text-accent">{baseline}/5</span>
-        </div>
-        <button
-          onClick={() => setRebasing(true)}
-          className="mt-1 w-full rounded-lg border border-border bg-surface py-2.5 text-sm text-txt hover:border-accent"
-        >
-          🎯 Re-run taste calibration
-        </button>
       </section>
 
       <section className="mt-6 space-y-2">
@@ -95,13 +55,6 @@ export default function Settings({ onExit, onResetTaste }) {
 
       <section className="mt-6 space-y-3">
         <h2 className="text-sm uppercase tracking-wider text-sub">Data</h2>
-        <button
-          onClick={exportList}
-          className="w-full rounded-lg border border-border bg-surface py-3 text-txt hover:border-accent"
-        >
-          Export my list (JSON)
-        </button>
-
         {!confirmReset ? (
           <button
             onClick={() => setConfirmReset(true)}
@@ -127,9 +80,15 @@ export default function Settings({ onExit, onResetTaste }) {
         )}
       </section>
 
-      <AnimatePresence>
-        {rebasing && <RebasePrompt autoStart onDone={() => setRebasing(false)} />}
-      </AnimatePresence>
+      <section className="mt-6 space-y-2 border-t border-border pt-5">
+        {user && <p className="truncate text-sm text-sub">Signed in as {user.name || user.email}</p>}
+        <button
+          onClick={logout}
+          className="w-full rounded-lg border border-border bg-surface py-3 text-sub hover:border-accent hover:text-txt"
+        >
+          ⎋ Sign out
+        </button>
+      </section>
     </div>
   );
 }

@@ -101,19 +101,15 @@ export default function TasteBattles({ recentlyWatched = [], onComplete, rounds 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, round]);
 
-  // Baseline is now derived, not typed in: average final Elo of the 5 picks.
-  function finishAndSetBaseline() {
-    const ids = new Set(recentlyWatched.map((t) => t.id));
-    const finals = state.titles.filter((t) => ids.has(t.id));
-    const avg = finals.length
-      ? Math.round(finals.reduce((s, t) => s + (t.eloScore ?? 1000), 0) / finals.length)
-      : 1000;
-    dispatch({ type: 'SET_TASTE', payload: { baseline: avg, tasteVersion: TASTE_VERSION } });
+  // Battles calibrate ORDER (Elo + genre weights); the rating scale itself is
+  // anchored by the fixed app-wide baseline, so nothing to derive here.
+  function finish() {
+    dispatch({ type: 'SET_TASTE', payload: { tasteVersion: TASTE_VERSION } });
     onComplete();
   }
 
   function advance() {
-    if (round + 1 >= ROUNDS) finishAndSetBaseline();
+    if (round + 1 >= ROUNDS) finish();
     else setRound((r) => r + 1);
   }
 
@@ -124,13 +120,13 @@ export default function TasteBattles({ recentlyWatched = [], onComplete, rounds 
 
   if (!ready)
     return (
-      <div className="flex min-h-screen items-center justify-center text-sub">
+      <div className="flex min-h-dvh items-center justify-center text-sub">
         Building battles…
       </div>
     );
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-5 py-8">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-2 px-5 py-8">
       <motion.p
         key={inPicksPhase ? 'picks' : 'pool'}
         initial={{ opacity: 0, y: -6 }}

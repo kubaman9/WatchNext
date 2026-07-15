@@ -12,18 +12,25 @@ const PICK_COUNT = 5;
 export default function PickPopular({ onContinue, onSkip }) {
   const buildPool = usePool();
   const [pool, setPool] = useState([]);
+  const [poolPage, setPoolPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
   const [searching, setSearching] = useState(false);
   const { query, setQuery, results, loading: searchLoading } = useSearch();
 
   useEffect(() => {
-    buildPool(30).then((titles) => {
+    setLoading(true);
+    buildPool(30, poolPage).then((titles) => {
+      // Empty deeper page (finite demo data) — wrap back to page 1.
+      if (!titles.length && poolPage > 1) {
+        setPoolPage(1);
+        return;
+      }
       setPool(titles);
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [poolPage]);
 
   function toggle(t) {
     setSelected((cur) => {
@@ -38,7 +45,7 @@ export default function PickPopular({ onContinue, onSkip }) {
   const done = selected.length >= PICK_COUNT;
 
   return (
-    <div className="mx-auto flex h-screen max-w-2xl flex-col px-5 py-6">
+    <div className="mx-auto flex h-dvh max-w-2xl flex-col px-5 py-6">
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -75,6 +82,14 @@ export default function PickPopular({ onContinue, onSkip }) {
         >
           Search instead
         </button>
+        {!searching && (
+          <button
+            onClick={() => setPoolPage((p) => p + 1)}
+            className="ml-auto rounded-full border border-border px-3 py-1.5 text-sm text-sub hover:text-txt active:scale-95"
+          >
+            ↻ Different titles
+          </button>
+        )}
       </div>
 
       {searching && (

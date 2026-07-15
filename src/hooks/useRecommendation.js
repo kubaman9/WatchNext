@@ -1,8 +1,9 @@
 import { useApp } from '../context/AppContext';
 import { score, weightedPick } from '../utils/scoring';
 
-const SUGGESTION_KEY = 'watchnext_suggestion';
-const WINDOW_MS = 10 * 60 * 1000; // one fresh suggestion per 10 minutes
+const SUGGESTION_KEY = 'watchnext_suggestions'; // { ids: string[], ts } — the 5 picks
+const WINDOW_MS = 10 * 60 * 1000; // one fresh batch of suggestions per 10 minutes
+const PICK_COUNT = 5;
 
 export function useRecommendation() {
   const { state } = useApp();
@@ -38,8 +39,31 @@ export function useRecommendation() {
     return weightedPick(ranked);
   }
 
-  // Rate-limited suggestion: returns the cached pick if one was made within the
-  // last 10 minutes (and it's still valid for the current mode), else a fresh one.
+  function eligible(id) {
+    return titles.find((t) => t.id === id && !t.watched && !t.disliked && !t.dismissed && inMode(t));
+  }
+
+  // Weighted sample WITHOUT replacement from the top of the ranked candidates —
+  // heavily favors the best matches but keeps the batch varied.
+  function sampleFive() {
+    const pool = candidates().slice(0, 12);
+    const out = [];
+    while (out.length < PICK_COUNT && pool.length) {
+      const weights = pool.map((_, i) => pool.length - i);
+      const total = weights.reduce((s, w) => s + w, 0);
+      let r = Math.random() * total;
+      let idx = 0;
+      for (; idx < pool.length; idx++) {
+        r -= weights[idx];
+        if (r <= 0) break;
+      }
+      out.push(pool.splice(Math.min(idx, pool.length - 1), 1)[0]);
+    }
+    return out;
+  }
+
+  // Rate-limited suggestions: one batch of five per 10-minute window. Re-taps
+  // inside the window return the same five (minus any that became ineligible).
   function suggest({ force = false } = {}) {
     const now = Date.now();
     let cached = null;
@@ -48,17 +72,28 @@ export function useRecommendation() {
     } catch {
       cached = null;
     }
-    if (!force && cached && now - cached.ts < WINDOW_MS) {
-      const still = titles.find(
-        (t) => t.id === cached.id && !t.watched && !t.disliked && inMode(t)
-      );
-      if (still) return { title: still, fresh: false, nextAt: cached.ts + WINDOW_MS };
+    if (!force && cached && Array.isArray(cached.ids) && now - cached.ts < WINDOW_MS) {
+      const still = cached.ids.map(eligible).filter(Boolean);
+      if (still.length) return { titles: still, fresh: false, nextAt: cached.ts + WINDOW_MS };
     }
-    const next = pick();
-    if (next) {
-      localStorage.setItem(SUGGESTION_KEY, JSON.stringify({ id: next.id, ts: now }));
+    const five = sampleFive();
+    if (five.length) {
+      localStorage.setItem(SUGGESTION_KEY, JSON.stringify({ ids: five.map((t) => t.id), ts: now }));
     }
-    return { title: next, fresh: true, nextAt: now + WINDOW_MS };
+    return { titles: five, fresh: true, nextAt: now + WINDOW_MS };
+  }
+
+  // Drop one title from the cached batch (e.g. after "not interested").
+  function removeSuggestion(id) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(SUGGESTION_KEY) || 'null');
+      if (cached && Array.isArray(cached.ids)) {
+        cached.ids = cached.ids.filter((x) => x !== id);
+        localStorage.setItem(SUGGESTION_KEY, JSON.stringify(cached));
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   function topPoster() {
@@ -77,5 +112,5 @@ export function useRecommendation() {
     }
   }
 
-  return { pick, suggest, candidates, topPoster, suggestionRemaining };
+  return { pick, suggest, removeSuggestion, candidates, topPoster, suggestionRemaining };
 }

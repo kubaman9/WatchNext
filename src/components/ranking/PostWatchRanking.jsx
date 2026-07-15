@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
-import { seedElo, estimateIndex, eloForIndex, randomPrompt } from '../../utils/rating';
+import { seedElo, estimateIndex, eloForIndex, randomPrompt, DEFAULT_BASELINE_ELO } from '../../utils/rating';
 import BattleArena from '../shared/BattleArena';
 
 // ── The one rating engine ─────────────────────────────────────────────────────
@@ -27,9 +27,9 @@ export default function PostWatchRanking({ title, onDone, thorough = false }) {
   if (rankedRef.current === null) rankedRef.current = watched.filter((t) => t.id !== title.id);
   const ranked = rankedRef.current;
 
-  const baseline = state.taste.baseline || 1000;
   const seedRef = useRef(null);
-  if (seedRef.current === null) seedRef.current = seedElo(title, { taste: state.taste, baseline });
+  if (seedRef.current === null)
+    seedRef.current = seedElo(title, { taste: state.taste, baseline: DEFAULT_BASELINE_ELO });
 
   // Guaranteed minimum comparisons: thorough → up to 5 (or list size); quick → 0.
   const minComparisons = thorough ? Math.min(5, ranked.length) : 0;

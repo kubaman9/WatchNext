@@ -20,7 +20,7 @@ const SORTS = {
   az: 'A–Z',
 };
 
-export default function MyList({ onExit }) {
+export default function MyList() {
   const { state, dispatch } = useApp();
   const { watched, rankOf, ratingOf, isProvisional } = useTitles();
   const [sort, setSort] = useState('rank');
@@ -54,11 +54,8 @@ export default function MyList({ onExit }) {
   }, [watched, sort, mode, q]);
 
   return (
-    <div className="mx-auto flex h-screen max-w-2xl flex-col px-5 py-5">
+    <div className="mx-auto flex h-full max-w-2xl flex-col px-5 py-5">
       <div className="flex shrink-0 items-center gap-3">
-        <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
-          ←
-        </button>
         <h1 className="font-display text-2xl text-txt">My List</h1>
         {stats && (
           <span className="ml-auto text-right text-xs text-sub">
@@ -162,13 +159,12 @@ export default function MyList({ onExit }) {
 
       {detail && <TitleDetail title={detail} onClose={() => setDetail(null)} />}
 
-      <AnimatePresence>
-        {sharpen && (
-          <Overlay key="sharpen" onClose={() => setSharpen(false)}>
-            <SharpenFlow onDone={() => setSharpen(false)} />
-          </Overlay>
-        )}
-      </AnimatePresence>
+      {/* No AnimatePresence — battle-subtree exits hang (see RankMode). */}
+      {sharpen && (
+        <Overlay key="sharpen" onClose={() => setSharpen(false)}>
+          <SharpenFlow onDone={() => setSharpen(false)} />
+        </Overlay>
+      )}
     </div>
   );
 }

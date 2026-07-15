@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext';
 import { genreMultiplier } from '../utils/scoring';
-import { eloToDisplayRating } from '../utils/rating';
+import { eloToDisplayRating, DEFAULT_BASELINE_ELO } from '../utils/rating';
 
 export function useTitles() {
   const { state } = useApp();
@@ -48,7 +48,7 @@ export function useTitles() {
       t.eloScore ?? 1000,
       Math.min(...elos),
       Math.max(...elos),
-      taste.baseline || 1000
+      DEFAULT_BASELINE_ELO
     );
   }
 

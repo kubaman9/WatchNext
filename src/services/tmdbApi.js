@@ -76,14 +76,32 @@ function normalize(raw) {
     genres: raw.genres ? raw.genres.map((g) => g.name) : genreNames(genreIds, type),
     genreIds,
     year: date ? Number(date.slice(0, 4)) : 0,
+    releaseDate: date,
     overview: raw.overview || '',
     rating: raw.vote_average || 0,
+    voteCount: raw.vote_count || 0,
     eloScore: 1000,
     watched: false,
     wins: 0,
     losses: 0,
     skippedFromButton: 0,
   };
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Feed-quality gate: enough votes to not be obscure noise, and already released.
+// Titles with no date at all only pass on vote count (a real audience implies
+// it's out). Search results are deliberately NOT filtered — if you type it, you
+// get it.
+const MIN_VOTES = { movie: 200, tv: 100 };
+
+function isQuality(t) {
+  if ((t.voteCount || 0) < (MIN_VOTES[t.type] || 100)) return false;
+  if (t.releaseDate && t.releaseDate > todayISO()) return false;
+  return true;
 }
 
 export async function loadGenres() {
@@ -112,7 +130,7 @@ export async function search(query) {
 export async function trending() {
   if (isDemoMode()) return mock.trending();
   const json = await get('/trending/all/week');
-  return json.results.filter((r) => r.poster_path).map(normalize);
+  return json.results.filter((r) => r.poster_path).map(normalize).filter(isQuality);
 }
 
 export async function popular(type = 'movie', page = 1) {
@@ -120,7 +138,8 @@ export async function popular(type = 'movie', page = 1) {
   const json = await get(`/${type}/popular`, { page });
   return json.results
     .filter((r) => r.poster_path)
-    .map((r) => normalize({ ...r, media_type: type }));
+    .map((r) => normalize({ ...r, media_type: type }))
+    .filter(isQuality);
 }
 
 // A ranked list from a given TMDB endpoint (popular / top_rated / trending).
@@ -129,7 +148,8 @@ async function fromSource(type, source, page) {
   const json = await get(path, { page });
   return (json.results || [])
     .filter((r) => r.poster_path)
-    .map((r) => normalize({ ...r, media_type: type }));
+    .map((r) => normalize({ ...r, media_type: type }))
+    .filter(isQuality);
 }
 
 // Titles matching ANY of the given genres (OR, via TMDB's `|` separator),
@@ -138,16 +158,19 @@ async function fromSource(type, source, page) {
 export async function discoverByGenres(type, genreIds, page = 1) {
   if (isDemoMode()) return mock.discoverByGenres(type, genreIds, page);
   if (!genreIds.length) return popular(type, page);
+  const dateKey = type === 'tv' ? 'first_air_date.lte' : 'primary_release_date.lte';
   try {
     const json = await get(`/discover/${type}`, {
       with_genres: genreIds.join('|'),
       sort_by: 'popularity.desc',
-      'vote_count.gte': 75,
+      'vote_count.gte': MIN_VOTES[type] || 100,
+      [dateKey]: todayISO(),
       page,
     });
     return (json.results || [])
       .filter((r) => r.poster_path)
-      .map((r) => normalize({ ...r, media_type: type }));
+      .map((r) => normalize({ ...r, media_type: type }))
+      .filter(isQuality);
   } catch {
     return [];
   }
@@ -163,7 +186,36 @@ export async function similarTo(id, type) {
     const json = await get(`/${type}/${id}/similar`);
     return (json.results || [])
       .filter((r) => r.poster_path)
-      .map((r) => normalize({ ...r, media_type: type }));
+      .map((r) => normalize({ ...r, media_type: type }))
+      .filter(isQuality);
+  } catch {
+    return [];
+  }
+}
+
+// Unreleased titles the user is likely to care about, for Home's "Coming soon"
+// row. Deliberately the ONLY place future dates are allowed — everywhere else
+// they're filtered out.
+export async function upcoming(topGenreIds = []) {
+  if (isDemoMode()) return mock.upcoming(topGenreIds);
+  const today = todayISO();
+  try {
+    const [mv, tv] = await Promise.all([
+      get('/movie/upcoming').catch(() => ({ results: [] })),
+      get('/discover/tv', {
+        'first_air_date.gte': today,
+        sort_by: 'popularity.desc',
+      }).catch(() => ({ results: [] })),
+    ]);
+    const all = [
+      ...(mv.results || []).map((r) => normalize({ ...r, media_type: 'movie' })),
+      ...(tv.results || []).map((r) => normalize({ ...r, media_type: 'tv' })),
+    ].filter((t) => t.poster && t.releaseDate && t.releaseDate > today);
+    // Prefer titles overlapping the user's favored genres, then by soonest.
+    const overlap = (t) => t.genreIds.filter((g) => topGenreIds.includes(g)).length;
+    all.sort((a, b) => overlap(b) - overlap(a) || a.releaseDate.localeCompare(b.releaseDate));
+    const seen = new Set();
+    return all.filter((t) => !seen.has(t.id) && seen.add(t.id)).slice(0, 12);
   } catch {
     return [];
   }
@@ -178,9 +230,15 @@ function shuffle(arr) {
   return a;
 }
 
-export async function buildPool(size = 50) {
-  if (isDemoMode()) return mock.buildPool(size);
-  const [tr, mp, tp] = await Promise.all([trending(), popular('movie'), popular('tv')]);
+// `page` lets onboarding's "show me different titles" pull a fresh batch;
+// trending has no useful pages, so it only contributes to page 1.
+export async function buildPool(size = 50, page = 1) {
+  if (isDemoMode()) return mock.buildPool(size, page);
+  const [tr, mp, tp] = await Promise.all([
+    page === 1 ? trending() : Promise.resolve([]),
+    popular('movie', page),
+    popular('tv', page),
+  ]);
   const seen = new Set();
   const out = [];
   for (const t of [...tr, ...mp, ...tp]) {

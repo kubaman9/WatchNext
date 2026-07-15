@@ -12,14 +12,13 @@ import RankMode from './components/ranking/RankMode';
 import MyList from './components/list/MyList';
 import WatchLater from './components/list/WatchLater';
 import Settings from './components/list/Settings';
-import NavDrawer from './components/shared/NavDrawer';
+import TabBar from './components/shared/TabBar';
 import Toast from './components/shared/Toast';
 
 export default function App() {
   const { state, dispatch } = useApp();
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
   const [view, setView] = useState('home');
-  const [drawer, setDrawer] = useState(false);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef();
 
@@ -42,7 +41,7 @@ export default function App() {
   }
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center text-sub">Loading…</div>;
+    return <div className="flex h-dvh items-center justify-center text-sub">Loading…</div>;
   }
 
   if (!user) {
@@ -63,29 +62,26 @@ export default function App() {
   }
 
   // Accounts onboarded under an older taste-calibration method get a one-time
-  // prompt to rebase. Rendered over the normal app, not blocking navigation.
+  // prompt to rebase (recalibrates order via battles; the scale itself is fixed).
   const needsRebase = (state.taste.tasteVersion ?? 0) < TASTE_VERSION;
 
   return (
     <>
-      {view === 'home' && (
-        <HomeScreen onOpenDrawer={() => setDrawer(true)} onNavigate={setView} onToast={showToast} />
-      )}
-      {view === 'list' && <MyList onExit={() => setView('home')} />}
-      {view === 'watchlater' && <WatchLater onExit={() => setView('home')} />}
-      {view === 'rank' && <RankMode onExit={() => setView('home')} />}
-      {view === 'settings' && (
-        <Settings onExit={() => setView('home')} onResetTaste={resetTaste} />
-      )}
+      {/* dvh shell: content fills the VISIBLE viewport (not behind mobile
+          browser chrome), tab bar pinned below it. Screens use h-full. */}
+      <div className="flex h-dvh flex-col">
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {view === 'home' && <HomeScreen onNavigate={setView} onToast={showToast} />}
+          {view === 'list' && <MyList />}
+          {view === 'watchlater' && <WatchLater />}
+          {view === 'rank' && <RankMode />}
+          {view === 'settings' && (
+            <Settings onExit={() => setView('home')} onResetTaste={resetTaste} />
+          )}
+        </div>
+        <TabBar current={view} onNavigate={setView} />
+      </div>
 
-      <NavDrawer
-        open={drawer}
-        current={view}
-        onNavigate={setView}
-        onClose={() => setDrawer(false)}
-        user={user}
-        onLogout={logout}
-      />
       {needsRebase && (
         <RebasePrompt
           onDone={(rebased) => {

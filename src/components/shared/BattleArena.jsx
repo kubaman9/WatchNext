@@ -53,18 +53,20 @@ function Card({ title, side, highlighted, winner, loser, onPick }) {
         winner ? { scale: 1.05 } : loser ? { opacity: 0.3, scale: 0.95 } : { scale: 1 }
       }
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-      className={`relative flex w-full flex-1 flex-col overflow-hidden rounded-xl border bg-surface text-left shadow-card ${
+      // Width from height budget (poster ≈ 34dvh each at 2:3) so the pair always
+      // shows full uncropped posters and fits short mobile viewports side by side.
+      className={`relative flex w-full max-w-[calc(34dvh*2/3)] flex-1 flex-col overflow-hidden rounded-xl border bg-surface text-left shadow-card ${
         highlighted ? 'border-accent ring-2 ring-accent shadow-glow' : 'border-border'
       }`}
       aria-label={`Pick ${title.title} (${side})`}
     >
       {winner && <WinBurst />}
-      <div className="aspect-[2/3] w-full">
+      <div className="relative aspect-[2/3] w-full">
         <img
           src={title.poster || FALLBACK}
           alt={title.title}
           onError={(e) => (e.currentTarget.src = FALLBACK)}
-          className="h-full max-h-[44vh] w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
       </div>
       <div className="p-2.5">
@@ -153,7 +155,7 @@ export default function BattleArena({
         initial={{ opacity: 0, x: 40 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.25 }}
-        className="flex w-full flex-row items-stretch gap-3"
+        className="flex w-full flex-row items-stretch justify-center gap-3"
       >
         <Card
           title={left}

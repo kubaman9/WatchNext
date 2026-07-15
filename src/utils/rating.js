@@ -7,6 +7,12 @@ export const RATING_MAX = 5;
 // Accounts onboarded under an older version get a one-time prompt to rebase.
 export const TASTE_VERSION = 2;
 
+// The rating scale anchors here for everyone. Tuning history: 5 rated
+// everything too high, 4 too low — 4.25 reads right. Not user-configurable
+// and not derived from battles; battles calibrate ORDER, this anchors SCALE.
+export const DEFAULT_BASELINE_RATING = 4.25;
+export const DEFAULT_BASELINE_ELO = Math.round(350 + DEFAULT_BASELINE_RATING * 210); // 1243
+
 // ── Baseline <-> rating mapping (out of 5) ────────────────────────────────────
 // A 1–5 personal baseline maps onto the Elo scale. 5 → 1400, 3 → 980, 1 → 560.
 export function ratingToElo(rating) {

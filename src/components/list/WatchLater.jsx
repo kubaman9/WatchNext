@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, Reorder, useDragControls } from 'framer-motion';
+import { Reorder, useDragControls } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import TypeBadge from '../shared/TypeBadge';
 import Overlay from '../shared/Overlay';
+import SearchSheet from '../shared/SearchSheet';
 import PostWatchRanking from '../ranking/PostWatchRanking';
 
 const FALLBACK =
@@ -68,11 +69,19 @@ function WatchLaterRow({ t, idx, onSeen, onRemove, onHandleDrag }) {
   );
 }
 
-export default function WatchLater({ onExit }) {
+export default function WatchLater() {
   const { state, dispatch } = useApp();
   const [ranking, setRanking] = useState(null);
+  const [adding, setAdding] = useState(false);
   const scrollRef = useRef(null);
   const velRef = useRef(0);
+
+  function addTitle(t) {
+    if (!state.titles.find((x) => x.id === t.id)) {
+      dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
+    }
+    dispatch({ type: 'ADD_WATCH_LATER', id: t.id });
+  }
 
   // Continuous auto-scroll loop — runs cheaply, only scrolls when velocity is set
   // (i.e. while a row is being dragged near an edge).
@@ -117,12 +126,15 @@ export default function WatchLater({ onExit }) {
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-2xl flex-col px-5 py-5">
+    <div className="mx-auto flex h-full max-w-2xl flex-col px-5 py-5">
       <div className="flex shrink-0 items-center gap-3">
-        <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
-          ←
-        </button>
         <h1 className="font-display text-2xl text-txt">Watch Later</h1>
+        <button
+          onClick={() => setAdding(true)}
+          className="ml-auto rounded-full border border-accent px-3 py-1 text-sm font-medium text-accent active:scale-95"
+        >
+          + Add a title
+        </button>
       </div>
       <p className="mt-1 shrink-0 text-sm text-sub">
         Drag the ⋮⋮ handle to reorder — titles near the top get suggested more.
@@ -149,13 +161,21 @@ export default function WatchLater({ onExit }) {
         </Reorder.Group>
       </div>
 
-      <AnimatePresence>
-        {ranking && (
-          <Overlay key="wl-rank">
-            <PostWatchRanking title={ranking} onDone={() => setRanking(null)} />
-          </Overlay>
-        )}
-      </AnimatePresence>
+      {/* No AnimatePresence — battle-subtree exits hang (see RankMode). */}
+      {ranking && (
+        <Overlay key="wl-rank">
+          <PostWatchRanking title={ranking} onDone={() => setRanking(null)} />
+        </Overlay>
+      )}
+
+      <SearchSheet
+        open={adding}
+        onClose={() => setAdding(false)}
+        onSelect={addTitle}
+        selectedIds={(state.watchLater || [])}
+        title="Add to Watch Later"
+        subtitle="Tap a title to add it — add as many as you like."
+      />
     </div>
   );
 }

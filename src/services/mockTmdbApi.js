@@ -74,8 +74,12 @@ export async function popular(type = 'movie') {
   return ALL.filter((t) => t.type === type).map((t) => ({ ...t }));
 }
 
-export async function buildPool(size = 50) {
+export async function buildPool(size = 50, _page = 1) {
   return ALL.slice(0, size).map((t) => ({ ...t }));
+}
+
+export async function upcoming() {
+  return []; // demo dataset has no future releases
 }
 
 export async function feedPage(page = 1, mode = 'both') {

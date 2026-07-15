@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useReducer } from 'react';
 import { loadState, saveState } from '../services/storage';
 import { updateElo } from '../utils/elo';
 import { bumpGenreWeights } from '../utils/scoring';
+import { DEFAULT_BASELINE_ELO } from '../utils/rating';
 
 const AppContext = createContext(null);
 
@@ -11,7 +12,7 @@ const initialState = {
     genreWeights: {},
     totalBattles: 0,
     onboardingComplete: false,
-    baseline: 1000,
+    baseline: DEFAULT_BASELINE_ELO,
     tasteVersion: 0,
   },
   settings: { mode: 'both' }, // 'movie' | 'tv' | 'both'
@@ -20,8 +21,12 @@ const initialState = {
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'HYDRATE':
-      return { ...state, ...action.payload };
+    case 'HYDRATE': {
+      const next = { ...state, ...action.payload };
+      // Baseline is a fixed app constant now — migrate any older stored value
+      // (from the slider/derived-baseline eras) so display ratings recompute.
+      return { ...next, taste: { ...next.taste, baseline: DEFAULT_BASELINE_ELO } };
+    }
 
     case 'ADD_TITLE': {
       if (state.titles.some((t) => t.id === action.title.id)) return state;
@@ -190,7 +195,7 @@ function reducer(state, action) {
           genreWeights: {},
           totalBattles: 0,
           onboardingComplete: false,
-          baseline: 1000,
+          baseline: DEFAULT_BASELINE_ELO,
           tasteVersion: 0,
         },
       };
@@ -204,7 +209,10 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState, (init) => {
     const saved = loadState();
-    return saved ? { ...init, ...saved } : init;
+    if (!saved) return init;
+    const merged = { ...init, ...saved };
+    // Same baseline migration as HYDRATE, for the localStorage boot path.
+    return { ...merged, taste: { ...merged.taste, baseline: DEFAULT_BASELINE_ELO } };
   });
 
   useEffect(() => {

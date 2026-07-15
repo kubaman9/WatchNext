@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { useTitles } from '../../hooks/useTitles';
 import { feedPage } from '../../services/tmdbApi';
@@ -15,6 +15,8 @@ const BUFFER = 5;
 function rerankInterval(lib) {
   return Math.min(5, Math.max(3, 8 - Math.floor(lib / 6)));
 }
+// Resurface a Watch Later title in the deck every N classifications.
+const WL_INTERVAL = 7;
 
 // Stable key for a pair regardless of order.
 function pairKey(a, b) {
@@ -40,14 +42,15 @@ function buildTasteContext(state) {
   return { topGenreIds, anchors };
 }
 
-export default function RankMode({ onExit }) {
+export default function RankMode() {
   const { state, dispatch } = useApp();
   const { watched } = useTitles();
   const mode = state.settings.mode || 'both';
 
   const [feed, setFeed] = useState([]);
   const [i, setI] = useState(0);
-  const [flow, setFlow] = useState(null); // { kind:'place', title } | { kind:'duel', a, b }
+  const [flow, setFlow] = useState(null); // { kind:'place', title, fromWL? } | { kind:'duel', a, b }
+  const [wlCard, setWlCard] = useState(null); // Watch Later title resurfaced in the deck
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -57,6 +60,8 @@ export default function RankMode({ onExit }) {
   const loadingMore = useRef(false);
   const exhausted = useRef(false);
   const sinceRerank = useRef(0);
+  const sinceWL = useRef(0);
+  const shownWlIds = useRef(new Set()); // cycle through Watch Later without repeats
   const shownPairs = useRef(new Set()); // avoid repeating the same re-rank matchup
   const started = useRef(false);
   const tasteRef = useRef(buildTasteContext(state));
@@ -188,6 +193,48 @@ export default function RankMode({ onExit }) {
     return false;
   }
 
+  // Every WL_INTERVAL classifications, resurface a Watch Later title as a
+  // special deck card ("seen it yet?") — cycling so the same one doesn't repeat.
+  function maybeWatchLater() {
+    const wlTitles = (state.watchLater || [])
+      .map((id) => state.titles.find((t) => t.id === id))
+      .filter((t) => t && !t.watched && !t.disliked);
+    if (!wlTitles.length) return false;
+    sinceWL.current += 1;
+    if (sinceWL.current < WL_INTERVAL) return false;
+    sinceWL.current = 0;
+    let pick = wlTitles.find((t) => !shownWlIds.current.has(t.id));
+    if (!pick) {
+      shownWlIds.current.clear();
+      pick = wlTitles[0];
+    }
+    shownWlIds.current.add(pick.id);
+    setWlCard(pick);
+    return true;
+  }
+
+  // Runs after every classification: Watch Later resurfacing wins over re-rank
+  // duels when both are due (both counters keep ticking regardless).
+  function afterClassify() {
+    if (maybeWatchLater()) return;
+    maybeRerank();
+  }
+
+  // ── Watch Later card actions ────────────────────────────────────────────────
+  function wlWatched() {
+    if (!wlCard) return;
+    dispatch({ type: 'MARK_WATCHED', id: wlCard.id });
+    setFlow({ kind: 'place', title: wlCard, fromWL: true });
+  }
+  function wlNotYet() {
+    setWlCard(null);
+  }
+  function wlRemove() {
+    if (!wlCard) return;
+    dispatch({ type: 'REMOVE_WATCH_LATER', id: wlCard.id });
+    setWlCard(null);
+  }
+
   function ensureInState(t) {
     if (!state.titles.find((x) => x.id === t.id)) {
       dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
@@ -196,7 +243,7 @@ export default function RankMode({ onExit }) {
 
   // "Yes" — seen it, place it in the ranked list.
   function yes() {
-    if (!card || flow) return;
+    if (!card || flow || wlCard) return;
     ensureInState(card);
     dispatch({ type: 'MARK_WATCHED', id: card.id });
     setFlow({ kind: 'place', title: card });
@@ -204,28 +251,32 @@ export default function RankMode({ onExit }) {
 
   // "Not Interested" — never recommend.
   function notInterested() {
-    if (!card || flow) return;
+    if (!card || flow || wlCard) return;
     ensureInState(card);
     dispatch({ type: 'DISLIKE_TITLE', id: card.id });
     setI((n) => n + 1);
-    maybeRerank();
+    afterClassify();
   }
 
   // "No" — haven't seen it, add to Watch Later.
   function no() {
-    if (!card || flow) return;
+    if (!card || flow || wlCard) return;
     ensureInState(card);
     dispatch({ type: 'ADD_WATCH_LATER', id: card.id });
     setI((n) => n + 1);
-    maybeRerank();
+    afterClassify();
   }
 
   function finishFlow() {
     const f = flow;
     setFlow(null);
     if (f?.kind === 'place') {
+      if (f.fromWL) {
+        setWlCard(null); // Watch Later card handled — deck position unchanged
+        return;
+      }
       setI((n) => n + 1);
-      maybeRerank();
+      afterClassify();
     }
   }
 
@@ -235,6 +286,12 @@ export default function RankMode({ onExit }) {
   useEffect(() => {
     function onKey(e) {
       if (flow) return;
+      if (wlCard) {
+        if (e.key === 'ArrowRight') wlWatched();
+        else if (e.key === 'ArrowLeft') wlRemove();
+        else if (e.key === 'ArrowUp') wlNotYet();
+        return;
+      }
       if (e.key === 'ArrowRight') yes();
       else if (e.key === 'ArrowLeft') notInterested();
       else if (e.key === 'ArrowUp') no();
@@ -242,20 +299,16 @@ export default function RankMode({ onExit }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card, flow]);
+  }, [card, flow, wlCard]);
 
   return (
-    <div className="mx-auto flex h-screen max-w-md flex-col px-5 py-4">
+    <div className="mx-auto flex h-full max-w-md flex-col px-5 py-4">
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex shrink-0 items-center justify-between"
+        className="flex shrink-0 items-center justify-center"
       >
-        <button onClick={onExit} className="text-2xl text-sub hover:text-txt" aria-label="Back">
-          ←
-        </button>
         <span className="font-display text-lg text-txt">Discover</span>
-        <span className="w-6" />
       </motion.div>
 
       <motion.div
@@ -268,7 +321,9 @@ export default function RankMode({ onExit }) {
       </motion.div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
-        {loading && <div className="h-full max-h-[46vh] w-full animate-pulse rounded-2xl bg-surface" />}
+        {loading && (
+          <div className="aspect-[2/3] w-[calc(40dvh*2/3)] max-w-full animate-pulse rounded-2xl bg-surface" />
+        )}
         {!loading && error && !card && (
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="text-center text-sub">
             <p className="font-display text-xl text-txt">Couldn’t load titles.</p>
@@ -288,57 +343,105 @@ export default function RankMode({ onExit }) {
             <p className="mt-1">Check back soon for more titles.</p>
           </motion.div>
         )}
-        {card && <SwipeCard key={card.id} card={card} onYes={yes} onLater={no} onNo={notInterested} />}
+        {wlCard ? (
+          <SwipeCard
+            key={`wl-${wlCard.id}`}
+            card={wlCard}
+            variant="watchLater"
+            onYes={wlWatched}
+            onLater={wlNotYet}
+            onNo={wlRemove}
+          />
+        ) : (
+          card && <SwipeCard key={card.id} card={card} onYes={yes} onLater={no} onNo={notInterested} />
+        )}
       </div>
 
-      {card && (
+      {wlCard ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
           className="shrink-0 space-y-2 pb-1"
         >
-          <p className="text-center text-sm text-sub">Have you seen this?</p>
+          <p className="text-center text-sm text-gold">🔖 On your Watch Later — seen it yet?</p>
           <motion.button
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.01 }}
-            onClick={yes}
+            onClick={wlWatched}
             className="w-full rounded-xl bg-win py-3 font-semibold text-white"
           >
-            Yes — rank it
+            Watched it — rank it
           </motion.button>
           <div className="flex gap-2">
             <motion.button
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.01 }}
-              onClick={no}
-              className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent"
+              onClick={wlNotYet}
+              className="flex-1 rounded-xl border border-gold/60 bg-surface py-3 font-semibold text-gold"
             >
-              Add to Watch Later
+              Not yet
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.01 }}
-              onClick={notInterested}
+              onClick={wlRemove}
               className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub"
             >
-              Not Interested
+              Remove
             </motion.button>
           </div>
         </motion.div>
+      ) : (
+        card && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="shrink-0 space-y-2 pb-1"
+          >
+            <p className="text-center text-sm text-sub">Have you seen this?</p>
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.01 }}
+              onClick={yes}
+              className="w-full rounded-xl bg-win py-3 font-semibold text-white"
+            >
+              Yes — rank it
+            </motion.button>
+            <div className="flex gap-2">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                whileHover={{ scale: 1.01 }}
+                onClick={no}
+                className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent"
+              >
+                Add to Watch Later
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                whileHover={{ scale: 1.01 }}
+                onClick={notInterested}
+                className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub"
+              >
+                Not Interested
+              </motion.button>
+            </div>
+          </motion.div>
+        )
       )}
 
-      <AnimatePresence>
-        {flow && (
-          <Overlay key="rank-flow">
-            {flow.kind === 'place' ? (
-              <PostWatchRanking title={flow.title} onDone={finishFlow} />
-            ) : (
-              <RerankDuel a={flow.a} b={flow.b} onDone={finishFlow} />
-            )}
-          </Overlay>
-        )}
-      </AnimatePresence>
+      {/* No AnimatePresence here — its exit tracking has repeatedly hung on
+          battle subtrees, leaving a dead overlay. Plain conditional render:
+          fades in via Overlay's own initial/animate, unmounts instantly. */}
+      {flow && (
+        <Overlay key="rank-flow">
+          {flow.kind === 'place' ? (
+            <PostWatchRanking title={flow.title} onDone={finishFlow} />
+          ) : (
+            <RerankDuel a={flow.a} b={flow.b} onDone={finishFlow} />
+          )}
+        </Overlay>
+      )}
     </div>
   );
 }
