@@ -13,7 +13,7 @@ export default function ModeToggle({ value, onChange, className = '' }) {
   const id = useId();
   return (
     <div
-      className={`inline-flex rounded-full border border-border bg-surface p-1 ${className}`}
+      className={`inline-flex rounded-none border border-border bg-surface p-1 ${className}`}
       role="tablist"
     >
       {OPTIONS.map((o) => {
@@ -24,13 +24,13 @@ export default function ModeToggle({ value, onChange, className = '' }) {
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.id)}
-            className="relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            className="relative rounded-none px-4 py-1.5 text-sm font-medium transition-colors"
           >
             {active && (
               <motion.span
                 layoutId={`${id}-mode-pill`}
                 transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                className={`absolute inset-0 rounded-full ${o.pill}`}
+                className={`absolute inset-0 rounded-none ${o.pill}`}
               />
             )}
             <span className={`relative z-10 ${active ? o.text : 'text-sub'}`}>{o.label}</span>

@@ -55,7 +55,7 @@ function Card({ title, side, highlighted, winner, loser, onPick }) {
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
       // Width from height budget (poster ≈ 34dvh each at 2:3) so the pair always
       // shows full uncropped posters and fits short mobile viewports side by side.
-      className={`relative flex w-full max-w-[calc(34dvh*2/3)] flex-1 flex-col overflow-hidden rounded-xl border bg-surface text-left shadow-card ${
+      className={`relative flex w-full max-w-[calc(34dvh*2/3)] flex-1 flex-col overflow-hidden rounded-none border bg-surface text-left shadow-card ${
         highlighted ? 'border-accent ring-2 ring-accent shadow-glow' : 'border-border'
       }`}
       aria-label={`Pick ${title.title} (${side})`}
@@ -131,7 +131,7 @@ export default function BattleArena({
   return (
     <div className="flex w-full max-w-3xl flex-col items-center gap-4">
       {progress != null && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-border">
+        <div className="h-1 w-full overflow-hidden rounded-none bg-border">
           <motion.div
             className="h-full bg-accent"
             initial={false}
@@ -182,7 +182,7 @@ export default function BattleArena({
           whileTap={{ scale: 0.95 }}
           animate={{ opacity: [0.85, 1, 0.85] }}
           transition={{ opacity: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } }}
-          className="w-full max-w-xs rounded-full bg-gradient-to-r from-accent-deep via-accent to-gold py-2.5 text-sm font-semibold text-white shadow-glow"
+          className="w-full max-w-xs rounded-none bg-gradient-to-r from-accent-deep via-accent to-gold py-2.5 text-sm font-semibold text-white shadow-glow"
         >
           {megaLabel}
         </motion.button>

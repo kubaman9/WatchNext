@@ -13,7 +13,7 @@ export default function PosterCard({ title, onClick, selected, rank, className =
       onClick={onClick}
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.95 }}
-      className={`group relative block w-full overflow-hidden rounded-[10px] border bg-surface text-left shadow-card transition-shadow hover:shadow-glow ${
+      className={`group relative block w-full overflow-hidden rounded-none border bg-surface text-left shadow-card transition-shadow hover:shadow-glow ${
         selected ? 'border-accent ring-2 ring-accent' : 'border-border'
       } ${className}`}
     >
@@ -27,12 +27,12 @@ export default function PosterCard({ title, onClick, selected, rank, className =
         />
       </div>
       {selected && (
-        <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-sm text-white">
+        <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-none bg-accent text-sm text-white">
           ✓
         </div>
       )}
       {rank != null && (
-        <div className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 font-display text-sm text-txt">
+        <div className="absolute left-2 top-2 rounded-none bg-black/70 px-2 py-0.5 font-display text-sm text-txt">
           #{rank}
         </div>
       )}

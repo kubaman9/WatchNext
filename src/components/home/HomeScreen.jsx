@@ -172,7 +172,7 @@ export default function HomeScreen({ onNavigate, onToast }) {
           <span className="font-display text-xl text-txt">WatchNext</span>
           <button
             onClick={() => onNavigate('settings')}
-            className="rounded-lg p-2 text-xl text-sub hover:bg-surface hover:text-txt"
+            className="rounded-none p-2 text-xl text-sub hover:bg-surface hover:text-txt"
             aria-label="Settings"
           >
             ⚙️
@@ -203,7 +203,7 @@ export default function HomeScreen({ onNavigate, onToast }) {
               onClick={fire}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
-              className="animate-glow min-h-[64px] w-full max-w-[400px] rounded-2xl bg-accent px-8 py-5 font-display text-2xl text-white"
+              className="animate-glow min-h-[64px] w-full max-w-[400px] rounded-none bg-accent px-8 py-5 font-display text-2xl text-white"
             >
               🎬 What Should I Watch?
             </motion.button>

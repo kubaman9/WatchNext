@@ -322,7 +322,7 @@ export default function RankMode() {
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
         {loading && (
-          <div className="aspect-[2/3] w-[calc(40dvh*2/3)] max-w-full animate-pulse rounded-2xl bg-surface" />
+          <div className="aspect-[2/3] w-[calc(40dvh*2/3)] max-w-full animate-pulse rounded-none bg-surface" />
         )}
         {!loading && error && !card && (
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="text-center text-sub">
@@ -331,7 +331,7 @@ export default function RankMode() {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={retry}
-              className="mt-4 rounded-xl bg-accent px-6 py-2.5 font-semibold text-white"
+              className="mt-4 rounded-none bg-accent px-6 py-2.5 font-semibold text-white"
             >
               Retry
             </motion.button>
@@ -368,7 +368,7 @@ export default function RankMode() {
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.01 }}
             onClick={wlWatched}
-            className="w-full rounded-xl bg-win py-3 font-semibold text-white"
+            className="w-full rounded-none bg-win py-3 font-semibold text-white"
           >
             Watched it — rank it
           </motion.button>
@@ -377,7 +377,7 @@ export default function RankMode() {
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.01 }}
               onClick={wlNotYet}
-              className="flex-1 rounded-xl border border-gold/60 bg-surface py-3 font-semibold text-gold"
+              className="flex-1 rounded-none border border-gold/60 bg-surface py-3 font-semibold text-gold"
             >
               Not yet
             </motion.button>
@@ -385,7 +385,7 @@ export default function RankMode() {
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.01 }}
               onClick={wlRemove}
-              className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub"
+              className="flex-1 rounded-none border border-border bg-surface py-3 font-medium text-sub"
             >
               Remove
             </motion.button>
@@ -404,7 +404,7 @@ export default function RankMode() {
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.01 }}
               onClick={yes}
-              className="w-full rounded-xl bg-win py-3 font-semibold text-white"
+              className="w-full rounded-none bg-win py-3 font-semibold text-white"
             >
               Yes — rank it
             </motion.button>
@@ -413,7 +413,7 @@ export default function RankMode() {
                 whileTap={{ scale: 0.96 }}
                 whileHover={{ scale: 1.01 }}
                 onClick={no}
-                className="flex-1 rounded-xl border border-accent bg-surface py-3 font-semibold text-accent"
+                className="flex-1 rounded-none border border-accent bg-surface py-3 font-semibold text-accent"
               >
                 Add to Watch Later
               </motion.button>
@@ -421,7 +421,7 @@ export default function RankMode() {
                 whileTap={{ scale: 0.96 }}
                 whileHover={{ scale: 1.01 }}
                 onClick={notInterested}
-                className="flex-1 rounded-xl border border-border bg-surface py-3 font-medium text-sub"
+                className="flex-1 rounded-none border border-border bg-surface py-3 font-medium text-sub"
               >
                 Not Interested
               </motion.button>

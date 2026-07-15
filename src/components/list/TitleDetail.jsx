@@ -36,7 +36,7 @@ export default function TitleDetail({ title, onClose }) {
         onClick={onClose}
       >
         <motion.div
-          className="max-h-[88vh] overflow-y-auto rounded-t-2xl border-t border-border bg-bg p-5"
+          className="max-h-[88vh] overflow-y-auto rounded-none border-t border-border bg-bg p-5"
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
@@ -48,7 +48,7 @@ export default function TitleDetail({ title, onClose }) {
               src={title.poster || FALLBACK}
               alt={title.title}
               onError={(e) => (e.currentTarget.src = FALLBACK)}
-              className="h-44 w-28 shrink-0 rounded-lg object-cover"
+              className="h-44 w-28 shrink-0 rounded-none object-cover"
             />
             <div className="min-w-0">
               <div className="font-display text-2xl text-txt">{title.title}</div>
@@ -83,28 +83,28 @@ export default function TitleDetail({ title, onClose }) {
           <div className="mt-5 flex gap-3">
             <button
               onClick={() => setReranking(true)}
-              className="flex-1 rounded-xl bg-accent py-3 font-semibold text-white active:scale-95"
+              className="flex-1 rounded-none bg-accent py-3 font-semibold text-white active:scale-95"
             >
               Re-rank
             </button>
             <button
               onClick={() => setConfirmRemove(true)}
-              className="rounded-xl border border-border bg-surface px-5 py-3 text-sub hover:text-txt"
+              className="rounded-none border border-border bg-surface px-5 py-3 text-sub hover:text-txt"
             >
               Remove
             </button>
           </div>
 
           {confirmRemove && (
-            <div className="mt-3 rounded-lg border border-border bg-surface p-3 text-sm">
+            <div className="mt-3 rounded-none border border-border bg-surface p-3 text-sm">
               <p className="text-txt">Remove {title.title} from your list?</p>
               <div className="mt-2 flex gap-2">
-                <button onClick={remove} className="rounded-md bg-red-600 px-3 py-1 text-white">
+                <button onClick={remove} className="rounded-none bg-red-600 px-3 py-1 text-white">
                   Remove
                 </button>
                 <button
                   onClick={() => setConfirmRemove(false)}
-                  className="rounded-md border border-border px-3 py-1 text-sub"
+                  className="rounded-none border border-border px-3 py-1 text-sub"
                 >
                   Cancel
                 </button>

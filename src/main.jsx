@@ -9,7 +9,10 @@ import './index.css';
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     {/* reducedMotion="user" makes every Framer animation honor the OS setting */}
-    <MotionConfig reducedMotion="user">
+    <MotionConfig
+      reducedMotion="user"
+      transition={{ type: 'spring', bounce: 0.28, duration: 0.5 }}
+    >
       <AuthProvider>
         <AppProvider>
           <App />

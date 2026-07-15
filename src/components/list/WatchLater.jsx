@@ -29,7 +29,7 @@ function WatchLaterRow({ t, idx, onSeen, onRemove, onHandleDrag }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
       whileDrag={{ scale: 1.03, boxShadow: '0 12px 30px -8px rgba(0,0,0,0.7)' }}
-      className="flex items-center gap-3 rounded-lg border border-border bg-surface p-2"
+      className="flex items-center gap-3 rounded-none border border-border bg-surface p-2"
     >
       <span
         onPointerDown={(e) => controls.start(e)}
@@ -43,7 +43,7 @@ function WatchLaterRow({ t, idx, onSeen, onRemove, onHandleDrag }) {
         src={t.poster || FALLBACK}
         alt={t.title}
         onError={(e) => (e.currentTarget.src = FALLBACK)}
-        className="h-14 w-10 shrink-0 rounded object-cover"
+        className="h-14 w-10 shrink-0 rounded-none object-cover"
       />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-txt">{t.title}</span>
@@ -54,7 +54,7 @@ function WatchLaterRow({ t, idx, onSeen, onRemove, onHandleDrag }) {
       </span>
       <button
         onClick={onSeen}
-        className="shrink-0 rounded-lg bg-win px-3 py-1.5 text-sm font-semibold text-white active:scale-95"
+        className="shrink-0 rounded-none bg-win px-3 py-1.5 text-sm font-semibold text-white active:scale-95"
       >
         Seen
       </button>
@@ -131,7 +131,7 @@ export default function WatchLater() {
         <h1 className="font-display text-2xl text-txt">Watch Later</h1>
         <button
           onClick={() => setAdding(true)}
-          className="ml-auto rounded-full border border-accent px-3 py-1 text-sm font-medium text-accent active:scale-95"
+          className="ml-auto rounded-none border border-accent px-3 py-1 text-sm font-medium text-accent active:scale-95"
         >
           + Add a title
         </button>

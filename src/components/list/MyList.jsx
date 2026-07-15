@@ -68,7 +68,7 @@ export default function MyList() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search your list…"
-        className="mt-4 w-full shrink-0 rounded-lg border border-border bg-surface px-4 py-2.5 text-txt outline-none focus:border-accent"
+        className="mt-4 w-full shrink-0 rounded-none border border-border bg-surface px-4 py-2.5 text-txt outline-none focus:border-accent"
       />
 
       <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2">
@@ -76,7 +76,7 @@ export default function MyList() {
           <button
             key={k}
             onClick={() => setSort(k)}
-            className={`rounded-full px-3 py-1 text-sm ${
+            className={`rounded-none px-3 py-1 text-sm ${
               sort === k ? 'bg-accent text-white' : 'border border-border text-sub'
             }`}
           >
@@ -93,7 +93,7 @@ export default function MyList() {
       {provisionalCount > 0 && (
         <button
           onClick={() => setSharpen(true)}
-          className="mt-3 shrink-0 rounded-lg border border-gold/50 bg-surface py-2 text-sm font-medium text-gold active:scale-95"
+          className="mt-3 shrink-0 rounded-none border border-gold/50 bg-surface py-2 text-sm font-medium text-gold active:scale-95"
         >
           ◇ Sharpen {provisionalCount} uncertain ranking{provisionalCount === 1 ? '' : 's'}
         </button>
@@ -115,7 +115,7 @@ export default function MyList() {
               <motion.button
                 whileTap={{ scale: 0.985 }}
                 onClick={() => setDetail(t)}
-                className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-2 text-left hover:border-accent"
+                className="flex w-full items-center gap-3 rounded-none border border-border bg-surface p-2 text-left hover:border-accent"
               >
               <span className="w-8 shrink-0 text-center font-display text-lg text-sub">
                 #{rankOf(t.id)}
@@ -124,7 +124,7 @@ export default function MyList() {
                 src={t.poster || FALLBACK}
                 alt={t.title}
                 onError={(e) => (e.currentTarget.src = FALLBACK)}
-                className="h-16 w-11 shrink-0 rounded object-cover"
+                className="h-16 w-11 shrink-0 rounded-none object-cover"
               />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export default function MyList() {
                   {isProvisional(t.id) && (
                     <span
                       title="Needs more comparisons to be sure"
-                      className="shrink-0 rounded-full border border-gold/50 px-1.5 text-[10px] uppercase tracking-wide text-gold"
+                      className="shrink-0 rounded-none border border-gold/50 px-1.5 text-[10px] uppercase tracking-wide text-gold"
                     >
                       ◇ provisional
                     </span>

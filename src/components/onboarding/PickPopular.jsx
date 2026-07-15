@@ -57,7 +57,7 @@ export default function PickPopular({ onContinue, onSkip }) {
           key={selected.length}
           initial={{ scale: 1.3 }}
           animate={{ scale: 1 }}
-          className={`absolute right-0 top-1 rounded-full px-3 py-1 text-sm font-semibold ${
+          className={`absolute right-0 top-1 rounded-none px-3 py-1 text-sm font-semibold ${
             done ? 'bg-win text-white' : 'bg-accent text-white'
           }`}
         >
@@ -68,7 +68,7 @@ export default function PickPopular({ onContinue, onSkip }) {
       <div className="mt-4 flex shrink-0 items-center gap-2">
         <button
           onClick={() => setSearching(false)}
-          className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-none px-3 py-1.5 text-sm font-medium transition-colors ${
             !searching ? 'bg-accent text-white' : 'border border-border text-sub'
           }`}
         >
@@ -76,7 +76,7 @@ export default function PickPopular({ onContinue, onSkip }) {
         </button>
         <button
           onClick={() => setSearching(true)}
-          className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-none px-3 py-1.5 text-sm font-medium transition-colors ${
             searching ? 'bg-accent text-white' : 'border border-border text-sub'
           }`}
         >
@@ -85,7 +85,7 @@ export default function PickPopular({ onContinue, onSkip }) {
         {!searching && (
           <button
             onClick={() => setPoolPage((p) => p + 1)}
-            className="ml-auto rounded-full border border-border px-3 py-1.5 text-sm text-sub hover:text-txt active:scale-95"
+            className="ml-auto rounded-none border border-border px-3 py-1.5 text-sm text-sub hover:text-txt active:scale-95"
           >
             ↻ Different titles
           </button>
@@ -98,7 +98,7 @@ export default function PickPopular({ onContinue, onSkip }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search movies & shows…"
-          className="mt-3 w-full shrink-0 rounded-lg border border-border bg-surface px-4 py-3 text-txt outline-none focus:border-accent"
+          className="mt-3 w-full shrink-0 rounded-none border border-border bg-surface px-4 py-3 text-txt outline-none focus:border-accent"
         />
       )}
 
@@ -131,7 +131,7 @@ export default function PickPopular({ onContinue, onSkip }) {
           whileTap={done ? { scale: 0.96 } : {}}
           animate={done ? { scale: [1, 1.03, 1] } : { scale: 1 }}
           transition={{ duration: 0.3 }}
-          className="w-full max-w-sm rounded-xl bg-accent py-4 font-semibold text-white disabled:opacity-40"
+          className="w-full max-w-sm rounded-none bg-accent py-4 font-semibold text-white disabled:opacity-40"
         >
           {done ? 'Continue →' : `Pick ${PICK_COUNT - selected.length} more`}
         </motion.button>

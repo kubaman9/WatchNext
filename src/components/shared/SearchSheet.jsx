@@ -27,7 +27,7 @@ export default function SearchSheet({
           onClick={onClose}
         >
           <motion.div
-            className="max-h-[85vh] overflow-hidden rounded-t-2xl border-t border-border bg-bg"
+            className="max-h-[85vh] overflow-hidden rounded-none border-t border-border bg-bg"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -49,7 +49,7 @@ export default function SearchSheet({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search movies & shows…"
-                className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-txt outline-none focus:border-accent"
+                className="w-full rounded-none border border-border bg-surface px-4 py-3 text-txt outline-none focus:border-accent"
               />
             </div>
             <div className="max-h-[55vh] overflow-y-auto px-4 pb-8">

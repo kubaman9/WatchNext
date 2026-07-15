@@ -48,7 +48,7 @@ export default function RebasePrompt({ onDone, autoStart = false }) {
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 onClick={() => setBattling(true)}
-                className="w-full rounded-xl bg-accent py-3.5 font-semibold text-white"
+                className="w-full rounded-none bg-accent py-3.5 font-semibold text-white"
               >
                 Rebase now
               </motion.button>
@@ -60,7 +60,7 @@ export default function RebasePrompt({ onDone, autoStart = false }) {
             <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={dismiss}
-              className="w-full rounded-xl bg-accent py-3.5 font-semibold text-white"
+              className="w-full rounded-none bg-accent py-3.5 font-semibold text-white"
             >
               Got it
             </motion.button>

@@ -28,7 +28,7 @@ export default function TabBar({ current, onNavigate }) {
               <motion.span
                 layoutId="tab-pill"
                 transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                className="absolute inset-x-3 inset-y-1 rounded-xl bg-accent/15"
+                className="absolute inset-x-3 inset-y-1 rounded-none bg-accent/15"
               />
             )}
             <span className="relative z-10 text-lg leading-none">{tab.icon}</span>

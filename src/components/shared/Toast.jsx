@@ -8,7 +8,7 @@ export default function Toast({ message }) {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 30 }}
-          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-border bg-surface px-5 py-2.5 text-sm text-txt shadow-card"
+          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-none border border-border bg-surface px-5 py-2.5 text-sm text-txt shadow-card"
         >
           {message}
         </motion.div>

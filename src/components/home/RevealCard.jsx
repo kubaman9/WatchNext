@@ -53,7 +53,7 @@ export default function RevealCard({
           animate={{ opacity: 1, scale: 1 }}
           // Width derived from height budget keeps the poster an exact 2:3 —
           // never cropped on desktop, never oversized on mobile.
-          className="mx-auto mt-2 w-[calc(42dvh*2/3)] max-w-full overflow-hidden rounded-xl border border-border shadow-card"
+          className="mx-auto mt-2 w-[calc(42dvh*2/3)] max-w-full overflow-hidden rounded-none border border-border shadow-card"
         >
           <div className="relative aspect-[2/3] w-full">
             <img
@@ -63,7 +63,7 @@ export default function RevealCard({
               className="absolute inset-0 h-full w-full object-cover"
             />
             {onWatchLater && title.releaseDate && (
-              <span className="absolute left-2 top-2 rounded-full bg-gold px-2.5 py-0.5 text-xs font-semibold text-black">
+              <span className="absolute left-2 top-2 rounded-none bg-gold px-2.5 py-0.5 text-xs font-semibold text-black">
                 {title.releaseDate}
               </span>
             )}
@@ -113,21 +113,21 @@ export default function RevealCard({
           {onWatchLater ? (
             <button
               onClick={onWatchLater}
-              className="flex-1 rounded-xl bg-gold py-4 font-semibold text-black transition-transform active:scale-95"
+              className="flex-1 rounded-none bg-gold py-4 font-semibold text-black transition-transform active:scale-95"
             >
               🔖 Add to Watch Later
             </button>
           ) : (
             <button
               onClick={onWatch}
-              className="flex-1 rounded-xl bg-win py-4 font-semibold text-white transition-transform active:scale-95"
+              className="flex-1 rounded-none bg-win py-4 font-semibold text-white transition-transform active:scale-95"
             >
               ✓ Watch This
             </button>
           )}
           <button
             onClick={onSkip}
-            className="rounded-xl border border-border bg-surface px-6 py-4 font-medium text-sub transition-transform active:scale-95 hover:text-txt"
+            className="rounded-none border border-border bg-surface px-6 py-4 font-medium text-sub transition-transform active:scale-95 hover:text-txt"
           >
             {onWatchLater ? 'Close' : 'Not Now →'}
           </button>

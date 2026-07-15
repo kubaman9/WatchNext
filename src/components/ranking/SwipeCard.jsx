@@ -79,12 +79,12 @@ export default function SwipeCard({ card, onYes, onLater, onNo, variant = 'disco
       // Card width is derived from the viewport HEIGHT budget (poster ≈ 40dvh at
       // 2:3), capped by available width — so the poster renders its full frame
       // on desktop (no vertical crop) and never overflows short mobile screens.
-      className={`relative flex w-[calc(40dvh*2/3)] max-w-full cursor-grab touch-none select-none flex-col overflow-hidden rounded-2xl border bg-surface shadow-card active:cursor-grabbing ${
+      className={`relative flex w-[calc(40dvh*2/3)] max-w-full cursor-grab touch-none select-none flex-col overflow-hidden rounded-none border bg-surface shadow-card active:cursor-grabbing ${
         isWL ? 'border-gold/70' : 'border-border'
       }`}
     >
       {isWL && (
-        <span className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-gold px-3 py-0.5 text-xs font-semibold text-black">
+        <span className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-none bg-gold px-3 py-0.5 text-xs font-semibold text-black">
           🔖 Watch Later
         </span>
       )}
@@ -101,19 +101,19 @@ export default function SwipeCard({ card, onYes, onLater, onNo, variant = 'disco
       {/* directional hints */}
       <motion.div
         style={{ opacity: yesOp }}
-        className="pointer-events-none absolute left-3 top-3 rotate-[-12deg] rounded-lg border-2 border-win px-3 py-1 font-display text-xl text-win"
+        className="pointer-events-none absolute left-3 top-3 rotate-[-12deg] rounded-none border-2 border-win px-3 py-1 font-display text-xl text-win"
       >
         {hints.right}
       </motion.div>
       <motion.div
         style={{ opacity: noOp }}
-        className="pointer-events-none absolute right-3 top-3 rotate-[12deg] rounded-lg border-2 border-sub px-3 py-1 font-display text-xl text-sub"
+        className="pointer-events-none absolute right-3 top-3 rotate-[12deg] rounded-none border-2 border-sub px-3 py-1 font-display text-xl text-sub"
       >
         {hints.left}
       </motion.div>
       <motion.div
         style={{ opacity: laterOp }}
-        className={`pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-lg border-2 px-3 py-1 font-display text-xl ${
+        className={`pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-none border-2 px-3 py-1 font-display text-xl ${
           isWL ? 'border-gold text-gold' : 'border-accent text-accent'
         }`}
       >

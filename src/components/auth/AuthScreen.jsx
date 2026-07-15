@@ -30,7 +30,7 @@ export default function AuthScreen() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-card"
+        className="w-full max-w-sm rounded-none border border-border bg-surface p-6 shadow-card"
       >
         <h1 className="font-display text-3xl text-txt">WatchNext</h1>
         <p className="mt-1 text-sub">
@@ -43,7 +43,7 @@ export default function AuthScreen() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Name (optional)"
-              className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-txt outline-none focus:border-accent"
+              className="w-full rounded-none border border-border bg-bg px-4 py-3 text-txt outline-none focus:border-accent"
             />
           )}
           <input
@@ -53,7 +53,7 @@ export default function AuthScreen() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             autoComplete="email"
-            className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-txt outline-none focus:border-accent"
+            className="w-full rounded-none border border-border bg-bg px-4 py-3 text-txt outline-none focus:border-accent"
           />
           <input
             type="password"
@@ -62,7 +62,7 @@ export default function AuthScreen() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password (6+ characters)"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-txt outline-none focus:border-accent"
+            className="w-full rounded-none border border-border bg-bg px-4 py-3 text-txt outline-none focus:border-accent"
           />
 
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -70,7 +70,7 @@ export default function AuthScreen() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-xl bg-accent py-3 font-semibold text-white disabled:opacity-50"
+            className="w-full rounded-none bg-accent py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
