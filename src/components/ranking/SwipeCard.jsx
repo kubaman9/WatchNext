@@ -131,6 +131,11 @@ export default function SwipeCard({ card, onYes, onLater, onNo, variant = 'disco
             <GenreBadge key={g}>{g}</GenreBadge>
           ))}
         </div>
+        {/* Was missing entirely — on mobile especially, a bare poster + title
+            gave no way to judge an unfamiliar title before swiping on it. */}
+        {card.overview && (
+          <p className="mt-2 line-clamp-3 text-xs leading-snug text-sub">{card.overview}</p>
+        )}
       </div>
     </motion.div>
   );

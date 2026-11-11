@@ -15,10 +15,6 @@ const FALLBACK =
 const DISMISS_OFFSET = 140;
 const DISMISS_VELOCITY = 550;
 
-// Swipe-the-poster-to-decide thresholds (Tinder-style Watch/Skip).
-const SWIPE_OFFSET = 110;
-const SWIPE_VELOCITY = 500;
-
 const TAP = { type: 'spring', stiffness: 420, damping: 26 };
 
 // A horizontal "slide to confirm" control — drag the tab all the way across
@@ -121,7 +117,6 @@ export default function RevealCard({
 
   const synopsis = title.overview || 'No synopsis available.';
   const long = synopsis.length > 140;
-  const swipeable = Boolean(onWatch && onDislike);
 
   // Confirming Watch Later dispatches immediately but leaves the card open
   // just long enough to show the ✓, then closes (which also refreshes the
@@ -131,22 +126,24 @@ export default function RevealCard({
     closeTimer.current = setTimeout(() => onClose(), 900);
   }
 
-  const posterX = useMotionValue(0);
-  const posterRotate = useTransform(posterX, [-150, 150], [-10, 10]);
-  const watchStampOpacity = useTransform(posterX, [15, SWIPE_OFFSET], [0, 1]);
-  const skipStampOpacity = useTransform(posterX, [-SWIPE_OFFSET, -15], [1, 0]);
+  // Holographic tilt-card effect on the poster: it leans away from wherever
+  // the pointer is, with a light sheen sweeping across — a "cool" tactile
+  // detail that's purely cosmetic (no drag-to-decide to fight with the
+  // handle's drag-to-dismiss, and nothing to misfire on a scroll or tap).
+  const tiltX = useMotionValue(0); // -0.5 .. 0.5 across the poster's width
+  const tiltY = useMotionValue(0);
+  const rotateX = useTransform(tiltY, [-0.5, 0.5], [9, -9]);
+  const rotateY = useTransform(tiltX, [-0.5, 0.5], [-9, 9]);
+  const sheenX = useTransform(tiltX, [-0.5, 0.5], ['-30%', '130%']);
 
-  function handlePosterDragEnd(_, info) {
-    if (!swipeable) return;
-    if (info.offset.x > SWIPE_OFFSET || info.velocity.x > SWIPE_VELOCITY) {
-      animate(posterX, 400, TAP);
-      onWatch();
-    } else if (info.offset.x < -SWIPE_OFFSET || info.velocity.x < -SWIPE_VELOCITY) {
-      animate(posterX, -400, TAP);
-      onDislike();
-    } else {
-      animate(posterX, 0, TAP);
-    }
+  function handlePosterPointerMove(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    tiltX.set((e.clientX - rect.left) / rect.width - 0.5);
+    tiltY.set((e.clientY - rect.top) / rect.height - 0.5);
+  }
+  function resetTilt() {
+    animate(tiltX, 0, TAP);
+    animate(tiltY, 0, TAP);
   }
 
   return (
@@ -182,58 +179,41 @@ export default function RevealCard({
           ✕
         </button>
 
-        <motion.div
-          key={title.id}
-          drag={swipeable ? 'x' : false}
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={{ left: 0.6, right: 0.6 }}
-          style={{ x: posterX, rotate: swipeable ? posterRotate : 0 }}
-          onDragEnd={handlePosterDragEnd}
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileTap={swipeable ? { scale: 1.02 } : undefined}
-          // Width derived from height budget keeps the poster an exact 2:3 —
-          // never cropped on desktop, never oversized on mobile.
-          className={
-            'relative mx-auto mt-2 w-[calc(42dvh*2/3)] max-w-full overflow-hidden rounded-none border border-border shadow-card' +
-            (swipeable ? ' cursor-grab active:cursor-grabbing' : '')
-          }
+        <div
+          style={{ perspective: 900 }}
+          className="mx-auto mt-2 w-[calc(42dvh*2/3)] max-w-full"
         >
-          <div className="relative aspect-[2/3] w-full">
-            <img
-              src={title.poster || FALLBACK}
-              alt={title.title}
-              onError={(e) => (e.currentTarget.src = FALLBACK)}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            {onWatchLater && title.releaseDate && (
-              <span className="absolute left-2 top-2 rounded-none bg-gold px-2.5 py-0.5 text-xs font-semibold text-black">
-                {title.releaseDate}
-              </span>
-            )}
-            {swipeable && (
-              <>
-                <motion.span
-                  style={{ opacity: watchStampOpacity }}
-                  className="pointer-events-none absolute left-3 top-3 -rotate-12 rounded-none border-4 border-win px-3 py-1 text-xl font-black tracking-wide text-win"
-                >
-                  WATCH
-                </motion.span>
-                <motion.span
-                  style={{ opacity: skipStampOpacity }}
-                  className="pointer-events-none absolute right-3 top-3 rotate-12 rounded-none border-4 border-accent px-3 py-1 text-xl font-black tracking-wide text-accent"
-                >
-                  SKIP
-                </motion.span>
-              </>
-            )}
-          </div>
-        </motion.div>
-        {swipeable && (
-          <p className="mt-1.5 text-center text-[11px] text-neutral">
-            Swipe the poster to decide, or use the buttons below
-          </p>
-        )}
+          <motion.div
+            key={title.id}
+            onPointerMove={handlePosterPointerMove}
+            onPointerLeave={resetTilt}
+            onPointerUp={resetTilt}
+            style={{ rotateX, rotateY }}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            // Width derived from height budget keeps the poster an exact 2:3 —
+            // never cropped on desktop, never oversized on mobile.
+            className="relative overflow-hidden rounded-none border border-border shadow-card"
+          >
+            <div className="relative aspect-[2/3] w-full">
+              <img
+                src={title.poster || FALLBACK}
+                alt={title.title}
+                onError={(e) => (e.currentTarget.src = FALLBACK)}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              {onWatchLater && title.releaseDate && (
+                <span className="absolute left-2 top-2 rounded-none bg-gold px-2.5 py-0.5 text-xs font-semibold text-black">
+                  {title.releaseDate}
+                </span>
+              )}
+              <motion.div
+                style={{ left: sheenX }}
+                className="pointer-events-none absolute inset-y-0 w-1/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              />
+            </div>
+          </motion.div>
+        </div>
 
         <h1 className="mt-3 font-display text-3xl leading-tight text-txt">{title.title}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
