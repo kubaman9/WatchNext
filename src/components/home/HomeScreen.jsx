@@ -113,18 +113,15 @@ export default function HomeScreen({ onNavigate, onToast }) {
     onToast(`Won’t suggest ${t.title} again.`);
   }
 
+  // Dispatches right away; the card itself stays open to show the slide's
+  // confirmed state, then calls closeReveal (passed as onClose) a beat later.
   function handleWatchLater() {
     const t = reveal;
     if (!state.titles.find((x) => x.id === t.id)) {
       dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
     }
     dispatch({ type: 'ADD_WATCH_LATER', id: t.id });
-    setReveal(null);
-    setPicker((p) => {
-      const next = (p || []).filter((x) => x.id !== t.id);
-      return next.length ? next : null;
-    });
-    onToast(`${t.title} added to Watch Later.`);
+    onToast(`${t.title} added to the top of Watch Later.`);
   }
 
   function addComingSoonToWL() {
@@ -291,6 +288,7 @@ export default function HomeScreen({ onNavigate, onToast }) {
             key="reveal"
             title={reveal}
             onWatch={handleWatch}
+            onAlreadyWatched={handleWatch}
             onAddToWatchLater={handleWatchLater}
             onDislike={handleDislike}
             onClose={closeReveal}

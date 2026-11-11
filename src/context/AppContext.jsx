@@ -147,7 +147,8 @@ function reducer(state, action) {
       const titles = state.titles.map((t) =>
         t.id === action.id ? { ...t, watchLater: true } : t
       );
-      return { ...state, titles, watchLater: [...state.watchLater, action.id] };
+      // Newest decision goes to the top — it's the one most likely on your mind.
+      return { ...state, titles, watchLater: [action.id, ...state.watchLater] };
     }
 
     case 'REMOVE_WATCH_LATER': {
