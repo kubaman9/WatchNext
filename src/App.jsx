@@ -22,7 +22,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef();
 
-  useCloudSync();
+  const { ready: cloudReady } = useCloudSync();
 
   useEffect(() => {
     loadGenres();
@@ -40,7 +40,11 @@ export default function App() {
     setView('home');
   }
 
-  if (loading) {
+  // Wait out auth restore AND the cloud pull before deciding what to show —
+  // otherwise a returning user briefly sees `onboardingComplete: false` (the
+  // local default) and the new-user onboarding flashes on screen for a beat
+  // before their real taste profile hydrates in.
+  if (loading || (user && !cloudReady)) {
     return <div className="flex h-dvh items-center justify-center text-sub">Loading…</div>;
   }
 

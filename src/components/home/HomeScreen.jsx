@@ -37,7 +37,7 @@ function PosterRow({ heading, items, onTap, badge }) {
 
 export default function HomeScreen({ onNavigate, onToast }) {
   const { state, dispatch } = useApp();
-  const { suggest, removeSuggestion, topPoster, suggestionRemaining } = useRecommendation();
+  const { suggest, topPoster } = useRecommendation();
   const { watched, rankOf } = useTitles();
   const mode = state.settings.mode || 'both';
 
@@ -48,14 +48,7 @@ export default function HomeScreen({ onNavigate, onToast }) {
   const [quickAdd, setQuickAdd] = useState(false);
   const [comingSoon, setComingSoon] = useState([]);
   const [bg] = useState(() => topPoster());
-  const [, tick] = useState(0);
   const fetchedUpcoming = useRef(false);
-
-  // Live countdown re-render.
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   // "Coming soon for you" — fetched once, biased toward the user's top genres.
   useEffect(() => {
@@ -71,27 +64,28 @@ export default function HomeScreen({ onNavigate, onToast }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const remaining = suggestionRemaining();
-  const countdown =
-    remaining > 0
-      ? `Fresh picks in ${Math.floor(remaining / 60000)}:${String(
-          Math.floor((remaining % 60000) / 1000)
-        ).padStart(2, '0')}`
-      : null;
-
   function inMode(t) {
     return mode === 'both' || t.type === mode;
   }
 
-  // One batch of five per 10 minutes — re-taps reopen the same five.
+  // A brand-new weighted batch of five every tap — no cooldown.
   function fire() {
-    const { titles, fresh } = suggest();
+    const { titles } = suggest();
     if (!titles.length) {
       onToast('Add some titles to your list first.');
       return;
     }
     setPicker(titles);
-    if (!fresh) onToast('Same five for now — a fresh batch unlocks soon.');
+  }
+
+  // Backing out of a suggestion (✕ or drag-down) without watching/disliking it
+  // refreshes the five-pick grid underneath, so it never sits stale.
+  function closeReveal() {
+    setReveal(null);
+    if (picker) {
+      const { titles } = suggest();
+      if (titles.length) setPicker(titles);
+    }
   }
 
   function handleWatch() {
@@ -111,13 +105,26 @@ export default function HomeScreen({ onNavigate, onToast }) {
       dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
     }
     dispatch({ type: 'DISLIKE_TITLE', id: t.id });
-    removeSuggestion(t.id);
     setReveal(null);
     setPicker((p) => {
       const next = (p || []).filter((x) => x.id !== t.id);
       return next.length ? next : null;
     });
     onToast(`Won’t suggest ${t.title} again.`);
+  }
+
+  function handleWatchLater() {
+    const t = reveal;
+    if (!state.titles.find((x) => x.id === t.id)) {
+      dispatch({ type: 'ADD_TITLE', title: { ...t, watched: false } });
+    }
+    dispatch({ type: 'ADD_WATCH_LATER', id: t.id });
+    setReveal(null);
+    setPicker((p) => {
+      const next = (p || []).filter((x) => x.id !== t.id);
+      return next.length ? next : null;
+    });
+    onToast(`${t.title} added to Watch Later.`);
   }
 
   function addComingSoonToWL() {
@@ -211,7 +218,7 @@ export default function HomeScreen({ onNavigate, onToast }) {
               variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }}
               className="mt-3 h-4 text-xs text-neutral"
             >
-              {countdown || 'Five fresh picks are ready'}
+              Five fresh picks, every time
             </motion.p>
           </motion.main>
 
@@ -284,9 +291,9 @@ export default function HomeScreen({ onNavigate, onToast }) {
             key="reveal"
             title={reveal}
             onWatch={handleWatch}
-            onSkip={() => setReveal(null)}
+            onAddToWatchLater={handleWatchLater}
             onDislike={handleDislike}
-            onClose={() => setReveal(null)}
+            onClose={closeReveal}
           />
         )}
       </AnimatePresence>
@@ -297,7 +304,6 @@ export default function HomeScreen({ onNavigate, onToast }) {
             key="coming-soon"
             title={comingSoonReveal}
             onWatchLater={addComingSoonToWL}
-            onSkip={() => setComingSoonReveal(null)}
             onClose={() => setComingSoonReveal(null)}
           />
         )}

@@ -1,8 +1,6 @@
 import { useApp } from '../context/AppContext';
 import { score, weightedPick } from '../utils/scoring';
 
-const SUGGESTION_KEY = 'watchnext_suggestions'; // { ids: string[], ts } — the 5 picks
-const WINDOW_MS = 10 * 60 * 1000; // one fresh batch of suggestions per 10 minutes
 const PICK_COUNT = 5;
 
 export function useRecommendation() {
@@ -39,10 +37,6 @@ export function useRecommendation() {
     return weightedPick(ranked);
   }
 
-  function eligible(id) {
-    return titles.find((t) => t.id === id && !t.watched && !t.disliked && !t.dismissed && inMode(t));
-  }
-
   // Weighted sample WITHOUT replacement from the top of the ranked candidates —
   // heavily favors the best matches but keeps the batch varied.
   function sampleFive() {
@@ -62,38 +56,9 @@ export function useRecommendation() {
     return out;
   }
 
-  // Rate-limited suggestions: one batch of five per 10-minute window. Re-taps
-  // inside the window return the same five (minus any that became ineligible).
-  function suggest({ force = false } = {}) {
-    const now = Date.now();
-    let cached = null;
-    try {
-      cached = JSON.parse(localStorage.getItem(SUGGESTION_KEY) || 'null');
-    } catch {
-      cached = null;
-    }
-    if (!force && cached && Array.isArray(cached.ids) && now - cached.ts < WINDOW_MS) {
-      const still = cached.ids.map(eligible).filter(Boolean);
-      if (still.length) return { titles: still, fresh: false, nextAt: cached.ts + WINDOW_MS };
-    }
-    const five = sampleFive();
-    if (five.length) {
-      localStorage.setItem(SUGGESTION_KEY, JSON.stringify({ ids: five.map((t) => t.id), ts: now }));
-    }
-    return { titles: five, fresh: true, nextAt: now + WINDOW_MS };
-  }
-
-  // Drop one title from the cached batch (e.g. after "not interested").
-  function removeSuggestion(id) {
-    try {
-      const cached = JSON.parse(localStorage.getItem(SUGGESTION_KEY) || 'null');
-      if (cached && Array.isArray(cached.ids)) {
-        cached.ids = cached.ids.filter((x) => x !== id);
-        localStorage.setItem(SUGGESTION_KEY, JSON.stringify(cached));
-      }
-    } catch {
-      /* ignore */
-    }
+  // Always a brand-new weighted batch of five — no cooldown, no reuse.
+  function suggest() {
+    return { titles: sampleFive() };
   }
 
   function topPoster() {
@@ -101,16 +66,5 @@ export function useRecommendation() {
     return ranked[0]?.poster || null;
   }
 
-  // Milliseconds until a fresh suggestion unlocks (0 if ready now).
-  function suggestionRemaining() {
-    try {
-      const cached = JSON.parse(localStorage.getItem(SUGGESTION_KEY) || 'null');
-      if (!cached) return 0;
-      return Math.max(0, cached.ts + WINDOW_MS - Date.now());
-    } catch {
-      return 0;
-    }
-  }
-
-  return { pick, suggest, removeSuggestion, candidates, topPoster, suggestionRemaining };
+  return { pick, suggest, candidates, topPoster };
 }
